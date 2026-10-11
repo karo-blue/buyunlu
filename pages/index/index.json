@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "步云录",
+  "navigationBarBackgroundColor": "#eef3ff",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#edf2ff",
+  "enablePullDownRefresh": false
+}

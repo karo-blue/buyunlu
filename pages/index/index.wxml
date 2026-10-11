@@ -1,0 +1,261 @@
+<view class="page-shell">
+  <view class="ambient ambient-one"></view>
+  <view class="ambient ambient-two"></view>
+
+  <scroll-view class="scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-into-view="{{scrollIntoView}}" scroll-with-animation>
+    <view class="content-stack">
+      <view class="career-header enter-one">
+        <view class="header-kicker-row">
+          <text class="header-kicker">{{nameKicker}}</text>
+          <text class="quarter-chip">{{quarterText}}</text>
+        </view>
+        <view class="career-title-row">
+          <view class="career-title-main">
+            <text wx:if="{{honor.awarded}}" class="career-honor">{{honor.badge}}</text>
+            <text class="career-rank">{{careerTitle}}</text>
+            <text class="career-period">{{state.year}}年度 · {{state.age}}岁</text>
+          </view>
+          <view class="career-index"><text class="index-current">{{state.rankIndex}}</text><text class="index-total">/ 11</text></view>
+        </view>
+        <view class="progress-row">
+          <view class="progress-track"><view class="progress-fill" style="width: {{progress * 100}}%;"></view></view>
+          <text class="progress-copy">任职 {{state.rankYears}} 年</text>
+        </view>
+      </view>
+
+      <view class="board-strip enter-two" aria-label="全网榜单">
+        <button class="board-button" hover-class="board-button-pressed" hover-stay-time="80" bindtap="showLeaderboard">
+          <view class="board-mark" aria-hidden="true">榜</view>
+          <text>全网排行榜</text>
+        </button>
+        <button class="board-button board-button-tiger" hover-class="board-button-pressed" hover-stay-time="80" bindtap="showTigerBoard">
+          <view class="board-mark board-mark-tiger" aria-hidden="true">虎</view>
+          <text>老虎榜</text>
+        </button>
+        <button class="board-button board-button-escape" hover-class="board-button-pressed" hover-stay-time="80" bindtap="showEscapeBoard">
+          <view class="board-mark board-mark-escape" aria-hidden="true">录</view>
+          <text>金蝉榜</text>
+        </button>
+      </view>
+
+      <view class="top-nav enter-two" role="tablist" aria-label="游戏功能导航">
+        <block wx:for="{{navItems}}" wx:key="key">
+          <button class="top-nav-item {{activeNav === item.key ? 'top-nav-item-active' : ''}}" hover-class="top-nav-item-pressed" hover-stay-time="80" data-nav="{{item.key}}" bindtap="selectNav" role="tab" aria-selected="{{activeNav === item.key}}">
+            <text>{{item.label}}</text>
+          </button>
+        </block>
+      </view>
+
+      <view class="mission-card enter-three">
+        <view class="mission-head">
+          <view class="mission-symbol">✓</view>
+          <view class="mission-heading">
+            <text class="eyebrow">本季度 · 核心任务</text>
+            <text class="mission-title">{{reviewText}}</text>
+          </view>
+        </view>
+        <text class="mission-result">{{lastResult}}</text>
+        <view class="mission-actions">
+          <button class="primary-button" hover-class="primary-button-pressed" hover-stay-time="80" bindtap="startQuarter">
+            <text class="primary-button-label">提交{{quarterText}}工作</text><text class="button-arrow">→</text>
+          </button>
+          <button class="promotion-button" hover-class="promotion-button-pressed" hover-stay-time="80" bindtap="showPromotionPath">
+            <text class="promotion-button-label">晋升条件</text><text class="promotion-status">{{promotionStatusText}}</text>
+          </button>
+        </view>
+      </view>
+
+      <view wx:if="{{currentEvent}}" id="event-card" class="event-card enter-three">
+        <view class="event-head">
+          <text class="event-kicker">步云录 · 当前事项</text>
+          <text class="event-title">{{currentEvent.title}}</text>
+        </view>
+        <text class="event-scene">{{currentEvent.scene}}</text>
+        <text class="event-tip">轻触下方选项选择处理方式，当前累计绩效：{{annualPerformanceLabel}}</text>
+        <view class="event-options">
+          <block wx:for="{{currentEvent.options}}" wx:key="text">
+            <button class="event-option" hover-class="event-option-pressed" hover-stay-time="80" data-index="{{index}}" bindtap="selectEventOption">
+              <text class="event-option-label">{{item.text}}</text>
+            </button>
+          </block>
+        </view>
+        <button class="event-cancel" hover-class="event-cancel-pressed" hover-stay-time="80" bindtap="cancelEvent">取消</button>
+      </view>
+
+      <view class="section enter-three">
+        <view class="section-head"><text class="section-title">状态概览</text><text class="section-note">实时变化</text></view>
+        <view class="metric-track">
+            <block wx:for="{{metrics}}" wx:key="label">
+              <button wx:if="{{item.action}}" class="metric metric-action metric-{{item.tone}}" hover-class="metric-pressed" data-action="{{item.action}}" bindtap="handleMetricAction">
+                <view class="metric-dot"></view>
+                <text class="metric-label">{{item.label}}</text>
+                <text class="metric-value">{{item.value}}</text>
+                <text class="metric-hint">点击处理</text>
+              </button>
+              <view wx:if="{{!item.action}}" class="metric metric-{{item.tone}}">
+                <view class="metric-dot"></view>
+                <text class="metric-label">{{item.label}}</text>
+                <text class="metric-value">{{item.value}}</text>
+              </view>
+            </block>
+        </view>
+      </view>
+
+      <view class="overview-card enter-four">
+        <view class="section-head"><text class="section-title">生活与资产</text><text class="section-note">年度总览</text></view>
+        <view class="overview-block">
+          <text class="overview-label">家庭状态</text>
+          <text class="overview-primary">{{lifeText}}</text>
+        </view>
+        <view class="hairline"></view>
+        <view class="overview-block">
+          <text class="overview-label">财务账户</text>
+          <text class="overview-primary">{{wealthText}}</text>
+          <text class="overview-secondary">{{compensationText}}</text>
+          <text class="overview-secondary">{{expenseText}}</text>
+          <text class="overview-warning">{{loanText}}</text>
+        </view>
+      </view>
+
+      <text class="copyright">虚构成长模拟 · 个人学习研究用途</text>
+    </view>
+  </scroll-view>
+
+  <!-- 固定在视口上的商品入口，避免跟随主页面滚动或被 scroll-view 裁切。 -->
+  <view class="wallet-float {{pay.enabled ? '' : 'wallet-float-disabled'}}" hover-class="wallet-float-pressed" hover-stay-time="80" bindtap="showAdCard" aria-label="{{pay.name}}">
+    <!-- 图标用 PNG 而不是 WebP：个别真机对 WebP 不渲染（开发者工具正常、真机空白）。
+         加载失败时退回文字徽章，不留一块空白。 -->
+    <image wx:if="{{!adCardIconBroken}}" class="wallet-float-icon" src="/assets/ad-free-card.png" mode="aspectFit" aria-hidden="true" binderror="onAdCardIconError" />
+    <text wx:else class="wallet-float-icon-fallback" aria-hidden="true">卡</text>
+    <view class="wallet-float-copy">
+      <text class="wallet-float-title">{{pay.name}}</text>
+      <!-- 有卡永远优先显示余额：买不买得了是另一回事，已经到手的卡不能显示成"暂未开放" -->
+      <text wx:if="{{pay.balance > 0}}" class="wallet-float-status">余额 {{pay.balance}} 张</text>
+      <text wx:elif="{{pay.enabled}}" class="wallet-float-status">尚未购买</text>
+      <text wx:else class="wallet-float-status">暂未开放</text>
+    </view>
+    <button class="wallet-float-buy" hover-class="wallet-float-buy-pressed" hover-stay-time="80" disabled="{{!pay.enabled || pay.buying}}" catchtap="chooseAdCardAmount">
+      <text wx:if="{{pay.enabled}}">{{pay.buyLabel}}</text>
+      <text wx:else>说明</text>
+    </button>
+  </view>
+
+  <view class="dialog-mask {{dialog.visible ? 'dialog-mask-open' : ''}} {{dialog.tone === 'danger' ? 'dialog-mask-danger' : ''}} {{dialog.tone === 'warning' ? 'dialog-mask-warning' : ''}}" catchtouchmove="true">
+    <view class="dialog-card {{dialog.tone === 'danger' ? 'dialog-card-danger' : ''}} {{dialog.tone === 'warning' ? 'dialog-card-warning' : ''}}" catchtap="noop">
+      <view wx:if="{{dialog.tone === 'danger'}}" class="danger-banner" aria-label="落马处理结论">
+        <text class="danger-word">落马</text>
+        <text class="danger-label">组织处理</text>
+      </view>
+      <view wx:elif="{{dialog.tone === 'warning'}}" class="warning-banner" aria-label="出逃结局">
+        <text class="warning-word">出逃</text>
+        <text class="warning-label">去向记录</text>
+      </view>
+      <view class="dialog-kicker">步云录 · 当前事项</view>
+      <text class="dialog-title">{{dialog.title}}</text>
+      <scroll-view class="dialog-content-scroll dialog-body" scroll-y enhanced show-scrollbar="{{false}}">
+        <text wx:if="{{dialog.content}}" class="dialog-content">{{dialog.content}}</text>
+        <view wx:if="{{dialog.rows.length}}" class="board-rows">
+          <block wx:for="{{dialog.rows}}" wx:key="index">
+            <text wx:if="{{item.kind === 'text'}}" class="board-text">{{item.text}}</text>
+            <text wx:elif="{{item.kind === 'note'}}" class="board-note">{{item.text}}</text>
+            <text wx:elif="{{item.kind === 'section'}}" class="board-section">{{item.text}}</text>
+            <view wx:elif="{{item.kind === 'gap'}}" class="board-gap" aria-label="前后共隔{{item.count}}名">
+              <view class="board-gap-line"></view>
+              <text class="board-gap-text">中间还有 {{item.count}} 人</text>
+              <view class="board-gap-line"></view>
+            </view>
+            <view wx:elif="{{item.kind === 'entry'}}" class="board-entry">
+              <view class="board-entry-main">
+                <!-- 奖牌列固定占位：没挂奖牌的行也保留这一格，名次号才能竖着对齐 -->
+                <text class="board-medal">{{item.medal}}</text>
+                <text class="board-rank">{{item.rank}}.</text>
+                <text class="board-name {{item.player ? 'board-name-player' : ''}}">{{item.name}}</text>
+                <text wx:if="{{item.honor}}" class="board-honor">{{item.honor}}</text>
+                <text wx:if="{{item.position}}" class="board-position">{{item.position}}</text>
+              </view>
+              <text wx:if="{{item.sub}}" class="board-sub {{item.player ? 'board-sub-player' : ''}}">{{item.sub}}</text>
+            </view>
+          </block>
+        </view>
+        <view wx:if="{{dialog.mode === 'amount'}}" class="dialog-amount-wrap">
+          <text class="dialog-amount-label">{{dialog.inputLabel || '支出金额'}}</text>
+          <input class="dialog-amount-input" type="number" maxlength="9" value="{{dialog.inputValue}}" placeholder="{{dialog.inputPlaceholder}}" placeholder-class="dialog-amount-placeholder" bindinput="dialogAmountInput" confirm-type="done" />
+          <text class="dialog-amount-unit">{{dialog.inputUnit || '元'}}</text>
+        </view>
+        <block wx:if="{{dialog.mode === 'actions'}}">
+          <view class="dialog-options">
+            <block wx:for="{{dialog.items}}" wx:key="index">
+              <button class="dialog-option" data-index="{{index}}" bindtap="dialogSelect"><text class="dialog-option-label">{{item}}</text></button>
+            </block>
+          </view>
+        </block>
+      </scroll-view>
+      <view wx:if="{{dialog.mode !== 'actions'}}" class="dialog-footer">
+        <button wx:if="{{dialog.showCancel}}" class="dialog-button secondary" bindtap="closeDialog">{{dialog.cancelText}}</button>
+        <button wx:if="{{dialog.shareAction && dialog.shareReady}}" class="dialog-button primary dialog-share-button" open-type="share" bindtap="shareFaultHelp">
+          <view class="share-icon" aria-hidden="true"></view><text>{{dialog.confirmText}}</text>
+        </button>
+        <button wx:elif="{{dialog.shareAction}}" class="dialog-button primary dialog-share-button" bindtap="shareFaultHelp">
+          <view class="share-icon" aria-hidden="true"></view><text>{{dialog.confirmText}}</text>
+        </button>
+        <button wx:else class="dialog-button primary" bindtap="dialogConfirm">{{dialog.confirmText}}</button>
+      </view>
+      <button wx:if="{{dialog.mode === 'actions'}}" class="dialog-cancel" bindtap="closeDialog">{{dialog.cancelText}}</button>
+    </view>
+  </view>
+
+  <view class="burst-mask {{burst.visible ? 'burst-mask-open' : ''}}" catchtouchmove="true">
+    <view class="burst-card" catchtap="noop">
+      <view class="burst-head">
+        <text class="burst-tag">{{burst.tag}}</text>
+        <text class="burst-flag burst-flag-{{burst.flag === '组织谈话' ? 'trial' : burst.review ? 'review' : 'normal'}}">{{burst.flag}}</text>
+      </view>
+      <text class="burst-title">{{burst.title}}</text>
+      <scroll-view class="burst-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+        <text class="burst-scene">{{burst.scene}}</text>
+        <view class="burst-options">
+          <block wx:for="{{burst.options}}" wx:key="text">
+            <button class="burst-option" hover-class="burst-option-pressed" hover-stay-time="80" data-index="{{index}}" bindtap="selectBurstOption">
+              <text class="burst-option-label">{{item.text}}</text>
+            </button>
+          </block>
+        </view>
+      </scroll-view>
+      <text class="burst-tip">{{burst.tip}}</text>
+    </view>
+  </view>
+
+  <view class="nameselect-mask {{nameSelect.visible ? 'nameselect-mask-open' : ''}}">
+    <view class="nameselect-backdrop" catchtap="noop" catchtouchmove="true"></view>
+    <view class="nameselect-card" catchtap="noop">
+      <scroll-view class="nameselect-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+        <text class="nameselect-kicker">步云录 · 开局起名</text>
+        <text class="nameselect-title">为你的仕途起个名字</text>
+        <text class="nameselect-sub">先选姓氏，再从每批15个内置名字中选择。名称不支持自由输入，只保存在本机存档中。</text>
+        <view class="nameselect-surname-row">
+          <text class="nameselect-field-label">姓氏</text>
+          <picker class="nameselect-picker" mode="selector" range="{{nameSelect.surnames}}" value="{{nameSelect.surnameIndex}}" bindchange="selectSurname">
+            <view class="nameselect-picker-value"><text>{{nameSelect.surname}}</text><text class="nameselect-picker-arrow">选择⌄</text></view>
+          </picker>
+        </view>
+        <view class="nameselect-choice-head">
+          <view>
+            <text class="nameselect-group nameselect-group-head">名字候选</text>
+            <text class="nameselect-choice-hint">每次随机展示15个</text>
+          </view>
+          <button class="nameselect-refresh" bindtap="refreshNameChoices">换一批</button>
+        </view>
+        <block wx:for="{{nameSelect.groups}}" wx:key="title" wx:for-item="group">
+          <view class="nameselect-chips">
+            <block wx:for="{{group.names}}" wx:key="*this" wx:for-item="name">
+              <button class="nameselect-chip {{nameSelect.selected === name ? 'nameselect-chip-on' : ''}}" data-name="{{name}}" bindtap="selectPresetName">{{name}}</button>
+            </block>
+          </view>
+        </block>
+        <text wx:if="{{nameSelect.selected}}" class="nameselect-preview">已选：{{nameSelect.selected}}</text>
+        <text wx:if="{{nameSelect.error}}" class="nameselect-error">{{nameSelect.error}}</text>
+        <button class="nameselect-confirm" bindtap="confirmName">确定开局</button>
+      </scroll-view>
+    </view>
+  </view>
+</view>

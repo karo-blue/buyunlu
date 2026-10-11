@@ -1,0 +1,130 @@
+{
+  "description": "步云录：仕途成长模拟",
+  "miniprogramRoot": "./",
+  "compileType": "miniprogram",
+  "libVersion": "3.7.3",
+  "appid": "touristappid",
+  "projectname": "buyunlu",
+  "setting": {
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": true,
+    "coverView": true,
+    "enhance": true,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": true,
+    "swc": false,
+    "disableSWC": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "condition": {},
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "folder",
+        "value": ".git"
+      },
+      {
+        "type": "folder",
+        "value": "tests"
+      },
+      {
+        "type": "folder",
+        "value": "tools"
+      },
+      {
+        "type": "folder",
+        "value": "server"
+      },
+      {
+        "type": "folder",
+        "value": ".workbuddy"
+      },
+      {
+        "type": "file",
+        "value": "deploy-server.ps1"
+      },
+      {
+        "type": "file",
+        "value": "deploy-server.bat"
+      },
+      {
+        "type": "file",
+        "value": "deploy-all.bat"
+      },
+      {
+        "type": "file",
+        "value": "configure-payment.ps1"
+      },
+      {
+        "type": "file",
+        "value": "configure-payment.bat"
+      },
+      {
+        "type": "file",
+        "value": "verify-payment-release.ps1"
+      },
+      {
+        "type": "file",
+        "value": "verify-payment-release.bat"
+      },
+      {
+        "type": "file",
+        "value": "PAYMENT-DEPLOYMENT-CHECKLIST.md"
+      },
+      {
+        "type": "file",
+        "value": "package.json"
+      },
+      {
+        "type": "file",
+        "value": "README.md"
+      },
+      {
+        "type": "file",
+        "value": "project.private.config.json"
+      },
+      {
+        "type": "folder",
+        "value": "mobile"
+      },
+      {
+        "type": "file",
+        "value": ".github"
+      },
+      {
+        "type": "file",
+        "value": "LICENSE"
+      },
+      {
+        "type": "file",
+        "value": "PRIVACY.md"
+      },
+      {
+        "type": "file",
+        "value": "THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "type": "file",
+        "value": ".gitignore"
+      }
+    ],
+    "include": []
+  },
+  "editorSetting": {}
+}

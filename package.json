@@ -1,0 +1,10 @@
+{
+  "name": "buyunlu-open-source",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "extract:source-data": "node tools/convert-source-data.js"
+  },
+  "version": "1.0.1",
+  "description": "步云录微信小程序开源源码",
+  "license": "MIT"
+}

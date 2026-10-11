@@ -1,0 +1,13 @@
+{
+  "pages": ["pages/index/index"],
+  "window": {
+    "navigationBarTitleText": "步云录",
+    "navigationBarBackgroundColor": "#eef3ff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#edf2ff",
+    "backgroundTextStyle": "light"
+  },
+  "lazyCodeLoading": "requiredComponents",
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

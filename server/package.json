@@ -1,0 +1,13 @@
+{
+  "name": "buyunlu-leaderboard-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "步云录全网人生排行榜服务",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
