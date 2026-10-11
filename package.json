@@ -4,7 +4,7 @@
     "test": "node --test --test-concurrency=1 tests/*.test.js",
     "extract:source-data": "node tools/convert-source-data.js"
   },
-  "version": "1.0.1",
-  "description": "步云录微信小程序开源源码",
-  "license": "MIT"
+  "version": "1.0.2",
+  "description": "步云录微信小程序公开源码，仅限非商业使用",
+  "license": "SEE LICENSE IN LICENSE"
 }

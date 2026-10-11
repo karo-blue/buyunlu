@@ -36,3 +36,20 @@ test('public repository contains only the mini-program distribution', () => {
   assert.ok(ignored.includes('*.apk'));
   assert.ok(require('../project.config.json').packOptions.ignore.some(item => item.type === 'folder' && item.value === '.git'));
 });
+
+test('published license consistently restricts use to noncommercial purposes', () => {
+  const root = path.join(__dirname, '..');
+  const licenseId = 'SEE LICENSE IN LICENSE';
+  assert.equal(require('../package.json').license, licenseId);
+  assert.equal(require('../server/package.json').license, 'SEE LICENSE IN ../LICENSE');
+  const license = fs.readFileSync(path.join(root, 'LICENSE'), 'utf8');
+  assert.match(license, /步云录非商业使用许可 1\.0/);
+  for (const restriction of ['不授权商业化使用', '售卖', '原样副本', '广告', '内购', '订阅', '收费运营']) assert.ok(license.includes(restriction), restriction);
+  assert.doesNotMatch(license, /PolyForm|MIT License/);
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  assert.match(readme, /不授权商业化使用/);
+  assert.match(readme, /旧版本.*MIT/);
+  assert.match(readme, /不会追溯撤回/);
+  assert.doesNotMatch(readme, /本项目按 MIT 许可证开源/);
+  assert.match(fs.readFileSync(path.join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8'), /步云录非商业使用许可 1\.0/);
+});
