@@ -1,0 +1,87 @@
+'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+
+function decode(text) {
+  return text.replace(/&(amp|lt|gt|quot|apos);/g, (_, entity) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }[entity]));
+}
+
+function parseWxml(source) {
+  const root = { children: [] };
+  const stack = [root];
+  const tokens = source.match(/<!--[\s\S]*?-->|<\/?[\w-]+\b(?:[^>"']|"[^"]*"|'[^']*')*>|[^<]+/g) || [];
+  for (const token of tokens) {
+    if (token.startsWith('<!--')) continue;
+    if (token.startsWith('</')) {
+      const tag = token.slice(2, -1).trim();
+      if (stack.length < 2 || stack.pop().tag !== tag) throw new Error(`WXML closing tag mismatch: ${tag}`);
+    } else if (token.startsWith('<')) {
+      const match = token.match(/^<([\w-]+)([\s\S]*?)\/?\s*>$/);
+      if (!match) throw new Error('Unsupported WXML tag');
+      const attrs = {};
+      const attrPattern = /([^\s=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'))?/g;
+      let attribute;
+      while ((attribute = attrPattern.exec(match[2]))) attrs[attribute[1]] = decode(attribute[2] ?? attribute[3] ?? '');
+      const node = { tag: match[1], attrs, children: [] };
+      stack[stack.length - 1].children.push(node);
+      if (!/\/\s*>$/.test(token)) stack.push(node);
+    } else if (token.trim()) stack[stack.length - 1].children.push({ text: decode(token) });
+  }
+  if (stack.length !== 1) throw new Error('Unclosed WXML tag');
+  return root.children;
+}
+
+function convertCss(source) {
+  return source.replace(/(-?(?:\d+\.?\d*|\.\d+))rpx\b/g, (_, value) => `calc(${value} * var(--rpx))`);
+}
+
+function mobileTemplate(nodes) {
+  return nodes.map(node => {
+    if (node.text != null) return { text: node.text.replaceAll('全网排行榜', '本机排行榜').replaceAll('全网榜单', '本机榜单') };
+    const attrs = { ...node.attrs };
+    if (attrs['open-type']) delete attrs['open-type'];
+    if (attrs['aria-label'] === '全网榜单') attrs['aria-label'] = '本机榜单';
+    if (attrs.src === '/assets/ad-free-card.png') attrs.src = 'assets/ad-free-card.png';
+    return { ...node, attrs, children: mobileTemplate(node.children) };
+  });
+}
+
+function listJs(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const file = path.join(directory, entry.name);
+    return entry.isDirectory() ? listJs(file) : entry.name.endsWith('.js') ? [file] : [];
+  });
+}
+
+function build(options = {}) {
+  const source = path.resolve(options.source || path.join(__dirname, '..'));
+  const output = path.resolve(options.output || path.join(source, 'docs'));
+  const template = mobileTemplate(parseWxml(fs.readFileSync(path.join(source, 'pages/index/index.wxml'), 'utf8')));
+  const files = [...listJs(path.join(source, 'game')), ...['storage', 'leaderboard', 'leaderboard-api', 'virtual-pay'].map(name => path.join(source, `services/${name}.js`)), path.join(source, 'pages/index/index.js')];
+  const entries = files.map(file => {
+    const id = path.relative(source, file).replaceAll('\\', '/').replace(/\.js$/, '');
+    let content = fs.readFileSync(file, 'utf8');
+    // The highest rank has a real zero-fault requirement; keep it in the mobile copy's display.
+    if (id === 'pages/index/index') content = content.replace('rank.faultLimit || 99', '(rank.faultLimit == null ? 99 : rank.faultLimit)');
+    return `${JSON.stringify(id)}: function(module, exports, require) {\n${content}\n}`;
+  });
+  entries.push('"services/config": function(module) { module.exports = { appId: "", rewardedAdUnitId: "", faultHelpAdUnitId: "", leaderboardApiBaseUrl: "", adCardName: "免广告卡", adCardCardsPerUnit: 10, adCardPriceYuan: 0 }; }');
+  const bundled = `(function() {\n'use strict';\nconst modules = {${entries.join(',\n')}};\nconst load = BuyunluRuntime.moduleLoader(modules);\nwindow.wx = BuyunluRuntime.createWx(window);\nlet page;\nwindow.Page = definition => { page = definition; };\nwindow.getCurrentPages = () => page ? [page] : [];\nload('pages/index/index');\nBuyunluOffline.install(page, { core: load('game/core'), storage: load('services/storage'), leaderboard: load('services/leaderboard'), host: window });\nBuyunluRuntime.attachPage(page, { document, root: document.getElementById('app'), template: ${JSON.stringify(template)}, afterRender: () => BuyunluRuntime.updateAccessibility(page, document) });\nwindow.buyunluPage = page;\nwindow.buyunluHandleBack = () => BuyunluOffline.handleBack(page);\npage.onLoad();\nif (page.onShow) page.onShow();\nwindow.addEventListener('pagehide', () => page.onUnload());\ndocument.addEventListener('visibilitychange', () => document.hidden ? page.onHide() : page.onShow && page.onShow());\nwindow.addEventListener('keydown', event => { if (event.key === 'Escape') window.buyunluHandleBack(); if (event.key === 'Tab') BuyunluRuntime.trapFocus(event, document); });\n})();\n`;
+  fs.mkdirSync(output, { recursive: true });
+  fs.mkdirSync(path.join(output, 'assets'), { recursive: true });
+  fs.copyFileSync(path.join(source, 'assets/ad-free-card.png'), path.join(output, 'assets/ad-free-card.png'));
+  fs.writeFileSync(path.join(output, 'game.js'), bundled);
+  fs.writeFileSync(path.join(output, 'template.json'), JSON.stringify(template));
+  for (const name of ['runtime.js', 'offline.js']) fs.copyFileSync(path.join(__dirname, name), path.join(output, name));
+  fs.writeFileSync(path.join(output, 'style.css'), convertCss(fs.readFileSync(path.join(source, 'pages/index/index.wxss'), 'utf8')) + '\n' + fs.readFileSync(path.join(__dirname, 'mobile.css'), 'utf8'));
+  fs.writeFileSync(path.join(output, 'index.html'), `<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#eef3ff"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'"><title>步云录 · 网页版</title><link rel="stylesheet" href="style.css"></head><body><main id="app" aria-label="步云录游戏"></main><div id="toast" role="status" aria-live="polite"></div><noscript>请启用 JavaScript 以运行离线游戏。</noscript><script src="runtime.js"></script><script src="offline.js"></script><script src="game.js"></script></body></html>\n`);
+  fs.copyFileSync(path.join(source, 'LICENSE'), path.join(output, 'LICENSE'));
+  fs.copyFileSync(path.join(source, 'PRIVACY.md'), path.join(output, 'PRIVACY.md'));
+  fs.copyFileSync(path.join(source, 'THIRD_PARTY_NOTICES.md'), path.join(output, 'THIRD_PARTY_NOTICES.md'));
+  fs.copyFileSync(path.join(__dirname, 'DEPLOY.txt'), path.join(output, '使用说明.txt'));
+  fs.writeFileSync(path.join(output, '.nojekyll'), '');
+  return { output, modules: entries.length, templateNodes: template.length };
+}
+
+module.exports = { parseWxml, convertCss, mobileTemplate, build };
+if (require.main === module) console.log(`已生成可直接部署的网页版：${build().output}`);

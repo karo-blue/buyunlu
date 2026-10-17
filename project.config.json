@@ -122,6 +122,14 @@
       {
         "type": "file",
         "value": ".gitignore"
+      },
+      {
+        "type": "folder",
+        "value": "web"
+      },
+      {
+        "type": "folder",
+        "value": "docs"
       }
     ],
     "include": []

@@ -22,11 +22,11 @@ test('an unconfigured leaderboard cannot send device data to a network service',
   } finally { delete global.wx; }
 });
 
-test('public repository contains only the mini-program distribution', () => {
+test('public repository includes standalone web without Android or private build files', () => {
   const root = path.join(__dirname, '..');
   assert.equal(fs.existsSync(path.join(root, 'mobile')), false);
   const pkg = require('../package.json');
-  assert.deepEqual(Object.keys(pkg.scripts).sort(), ['extract:source-data', 'test']);
+  assert.deepEqual(Object.keys(pkg.scripts).sort(), ['build:web', 'extract:source-data', 'start', 'test', 'test:web']);
   assert.doesNotMatch(pkg.description, /安卓|Android|离线版/);
   for (const file of ['README.md', 'RELEASE_NOTES.md', 'PRIVACY.md', 'THIRD_PARTY_NOTICES.md']) {
     assert.doesNotMatch(fs.readFileSync(path.join(root, file), 'utf8'), /mobile\/|安卓|Android SDK|WebView|手机兼容层/);
