@@ -53,6 +53,10 @@
       },
       {
         "type": "folder",
+        "value": "web-server"
+      },
+      {
+        "type": "folder",
         "value": ".workbuddy"
       },
       {

@@ -7,6 +7,7 @@ project.private.config.json
 .env.*
 !.env.example
 server/data/
+web-server/data/
 *.pem
 *.key
 *.jks

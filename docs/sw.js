@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = '1.0.5';
+const VERSION = '1.0.6';
 const SCOPE = self.registration.scope;
 const CACHE_PREFIX = 'buyunlu-web:' + SCOPE + ':';
 const CACHE_NAME = CACHE_PREFIX + VERSION;
@@ -8,6 +8,8 @@ const INDEX = scoped('index.html?v=' + VERSION);
 const PRECACHE = [
   'index.html?v=' + VERSION, 'style.css?v=' + VERSION,
   'runtime.js?v=' + VERSION, 'offline.js?v=' + VERSION, 'game.js?v=' + VERSION,
+  'site.js?v=' + VERSION, 'commerce-api.js?v=' + VERSION,
+  'commerce-account.js?v=' + VERSION, 'commerce.js?v=' + VERSION, 'commerce.css?v=' + VERSION,
   'pwa.js?v=' + VERSION, 'manifest.webmanifest?v=' + VERSION,
   'assets/apple-touch-icon.png?v=' + VERSION, 'assets/icon-192.png', 'assets/icon-512.png',
   'assets/ad-free-card.png', 'template.json', 'LICENSE', 'PRIVACY.md',

@@ -19,7 +19,7 @@ test('committed web distribution rebuilds exactly from the public source', () =>
     assert.deepEqual(walk(path.join(root, 'docs')).sort(), expected);
     for (const file of expected) assert.deepEqual(fs.readFileSync(path.join(root, 'docs', file)), fs.readFileSync(path.join(output, file)), file);
     const html = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
-    assert.match(html, /connect-src 'none'/);
+    assert.ok(html.includes('connect-src ' + new URL(require('../web/site.json').apiBaseUrl).origin));
     const version = require('../package.json').version;
     const assets = [...html.matchAll(/(?:src|href)="([^"]+)"/g)];
     assert.ok(assets.length > 0);

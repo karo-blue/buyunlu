@@ -57,6 +57,8 @@ function build(options = {}) {
   const source = path.resolve(options.source || path.join(__dirname, '..'));
   const output = path.resolve(options.output || path.join(source, 'docs'));
   const assetVersion = encodeURIComponent(JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8')).version);
+  const site = options.site || JSON.parse(fs.readFileSync(path.join(__dirname, 'site.json'), 'utf8'));
+  const apiOrigin = new URL(site.apiBaseUrl).origin;
   const template = mobileTemplate(parseWxml(fs.readFileSync(path.join(source, 'pages/index/index.wxml'), 'utf8')));
   const files = [...listJs(path.join(source, 'game')), ...['storage', 'leaderboard', 'leaderboard-api', 'virtual-pay'].map(name => path.join(source, `services/${name}.js`)), path.join(source, 'pages/index/index.js')];
   const entries = files.map(file => {
@@ -67,7 +69,8 @@ function build(options = {}) {
     return `${JSON.stringify(id)}: function(module, exports, require) {\n${content}\n}`;
   });
   entries.push('"services/config": function(module) { module.exports = { appId: "", rewardedAdUnitId: "", faultHelpAdUnitId: "", leaderboardApiBaseUrl: "", adCardName: "免广告卡", adCardCardsPerUnit: 10, adCardPriceYuan: 0 }; }');
-  const bundled = `(function() {\n'use strict';\nconst modules = {${entries.join(',\n')}};\nconst load = BuyunluRuntime.moduleLoader(modules);\nwindow.wx = BuyunluRuntime.createWx(window);\nlet page;\nwindow.Page = definition => { page = definition; };\nwindow.getCurrentPages = () => page ? [page] : [];\nload('pages/index/index');\nBuyunluOffline.install(page, { core: load('game/core'), storage: load('services/storage'), leaderboard: load('services/leaderboard'), host: window });\nBuyunluRuntime.attachPage(page, { document, root: document.getElementById('app'), template: ${JSON.stringify(template)}, afterRender: () => BuyunluRuntime.updateAccessibility(page, document) });\nwindow.buyunluPage = page;\nwindow.buyunluHandleBack = () => BuyunluOffline.handleBack(page);\npage.onLoad();\nif (page.onShow) page.onShow();\nwindow.addEventListener('pagehide', () => page.onUnload());\ndocument.addEventListener('visibilitychange', () => document.hidden ? page.onHide() : page.onShow && page.onShow());\nwindow.addEventListener('keydown', event => { if (event.key === 'Escape') window.buyunluHandleBack(); if (event.key === 'Tab') BuyunluRuntime.trapFocus(event, document); });\n})();\n`;
+  let bundled = `(function() {\n'use strict';\nconst modules = {${entries.join(',\n')}};\nconst load = BuyunluRuntime.moduleLoader(modules);\nwindow.wx = BuyunluRuntime.createWx(window);\nlet page;\nwindow.Page = definition => { page = definition; };\nwindow.getCurrentPages = () => page ? [page] : [];\nload('pages/index/index');\nBuyunluOffline.install(page, { core: load('game/core'), storage: load('services/storage'), leaderboard: load('services/leaderboard'), host: window });\nBuyunluRuntime.attachPage(page, { document, root: document.getElementById('app'), template: ${JSON.stringify(template)}, afterRender: () => BuyunluRuntime.updateAccessibility(page, document) });\nwindow.buyunluPage = page;\nwindow.buyunluHandleBack = () => BuyunluOffline.handleBack(page);\npage.onLoad();\nif (page.onShow) page.onShow();\nwindow.addEventListener('pagehide', () => page.onUnload());\ndocument.addEventListener('visibilitychange', () => document.hidden ? page.onHide() : page.onShow && page.onShow());\nwindow.addEventListener('keydown', event => { if (event.key === 'Escape') window.buyunluHandleBack(); if (event.key === 'Tab') BuyunluRuntime.trapFocus(event, document); });\n})();\n`;
+  bundled = bundled.replace('BuyunluRuntime.attachPage(page,', "if (window.BuyunluWebConfig && !window.BuyunluCommerce) throw new Error('购卡组件未能加载，请刷新');\nif (window.BuyunluCommerce) BuyunluCommerce.install(page, { host: window });\nBuyunluRuntime.attachPage(page,");
   fs.mkdirSync(output, { recursive: true });
   fs.mkdirSync(path.join(output, 'assets'), { recursive: true });
   fs.copyFileSync(path.join(source, 'assets/ad-free-card.png'), path.join(output, 'assets/ad-free-card.png'));
@@ -76,6 +79,20 @@ function build(options = {}) {
   for (const name of ['runtime.js', 'offline.js']) fs.copyFileSync(path.join(__dirname, name), path.join(output, name));
   fs.writeFileSync(path.join(output, 'style.css'), convertCss(fs.readFileSync(path.join(source, 'pages/index/index.wxss'), 'utf8')) + '\n' + fs.readFileSync(path.join(__dirname, 'mobile.css'), 'utf8'));
   fs.writeFileSync(path.join(output, 'index.html'), `<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#eef3ff"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; worker-src 'self'; manifest-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="步云录"><title>步云录 · 网页版</title><link rel="manifest" href="manifest.webmanifest?v=${assetVersion}"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=${assetVersion}"><link rel="stylesheet" href="style.css?v=${assetVersion}"></head><body><main id="app" aria-label="步云录游戏"></main><div id="toast" role="status" aria-live="polite"></div><noscript>请启用 JavaScript 以运行离线游戏。</noscript><script src="runtime.js?v=${assetVersion}"></script><script src="offline.js?v=${assetVersion}"></script><script src="game.js?v=${assetVersion}"></script><script src="pwa.js?v=${assetVersion}"></script></body></html>\n`);
+  const indexFile = path.join(output, 'index.html');
+  fs.writeFileSync(indexFile, fs.readFileSync(indexFile, 'utf8')
+    .replace("connect-src 'none'", 'connect-src ' + apiOrigin)
+    .replace('</head>', `<link rel="stylesheet" href="commerce.css?v=${assetVersion}"></head>`)
+    .replace('<script src="runtime.js', fs.readFileSync(path.join(__dirname, 'commerce-account.html'), 'utf8') +
+      ['site.js','commerce-api.js','commerce-account.js','commerce.js'].map(name=>`<script src="${name}?v=${assetVersion}"></script>`).join('') + '<script src="runtime.js'));
+  fs.writeFileSync(path.join(output, 'site.js'), 'window.BuyunluWebConfig = ' + JSON.stringify(site) + ';\n');
+  for (const name of ['commerce-api.js','commerce-account.js','commerce.js','commerce.css','checkout.js','checkout.html','product.html','theme.css','store.css']) {
+    let text = fs.readFileSync(path.join(__dirname, name), 'utf8');
+    if (name.endsWith('.html')) text = text
+      .replace('</head>', `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ${apiOrigin}; base-uri 'none'; form-action 'none'"></head>`)
+      .replace(/(?:src|href)="([\w-]+\.(?:js|css))"/g, (_,asset) => `${asset.endsWith('.css')?'href':'src'}="${asset}?v=${assetVersion}"`);
+    fs.writeFileSync(path.join(output,name),text);
+  }
   fs.copyFileSync(path.join(source, 'LICENSE'), path.join(output, 'LICENSE'));
   fs.copyFileSync(path.join(source, 'PRIVACY.md'), path.join(output, 'PRIVACY.md'));
   fs.copyFileSync(path.join(source, 'THIRD_PARTY_NOTICES.md'), path.join(output, 'THIRD_PARTY_NOTICES.md'));

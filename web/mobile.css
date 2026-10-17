@@ -4,6 +4,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; width: 100%; min-height: 100%; background: #edf2ff; }
 body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 #app { width: var(--app-width); margin: 0 auto; }
 button, input, select { font: inherit; }
 button { cursor: pointer; min-height: 48px !important; min-width: 48px; touch-action: manipulation; border: 0; }
@@ -31,8 +32,42 @@ button:active { filter: brightness(.96); }
 .nameselect-chip { flex: 0 0 calc(33.333% - 8px); width: calc(33.333% - 8px) !important; margin-right: 8px !important; margin-bottom: 8px !important; }
 .nameselect-sub, .dialog-content, .mission-result, .event-scene, .burst-scene { font-size: max(14px, calc(26 * var(--rpx))); }
 .copyright, .board-note { font-size: max(12px, calc(21 * var(--rpx))); }
+/* Keep phone text readable without scaling the whole desktop layout. */
+.header-kicker, .quarter-chip, .career-period, .progress-copy, .eyebrow, .section-note, .event-kicker, .overview-label,
+.nameselect-kicker, .nameselect-field-label, .nameselect-picker-arrow, .nameselect-choice-hint { font-size: max(12px, calc(23 * var(--rpx))); }
+.top-nav-item, .nameselect-chip, .nameselect-refresh, .nameselect-picker-value { font-size: max(14px, calc(27 * var(--rpx))); }
+.top-nav-item { min-width: 0; padding-left: 4px; padding-right: 4px; }
+.nameselect-title { font-size: max(22px, calc(38 * var(--rpx))); }
+.nameselect-confirm { font-size: max(16px, calc(30 * var(--rpx))); }
+.board-button { height: auto !important; padding: 8px 6px !important; font-size: max(12px, calc(23 * var(--rpx))); line-height: 1.4; }
+.board-button > span { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.board-mark { flex-shrink: 0; }
+.mission-title, .section-title { font-size: max(16px, calc(32 * var(--rpx))); }
+.mission-heading { min-width: 0; }
+.primary-button, .promotion-button { font-size: max(14px, calc(27 * var(--rpx))); }
+.promotion-status, .metric-hint { font-size: max(12px, calc(21 * var(--rpx))); }
+.metric-label { min-height: 32px; font-size: 12px; line-height: 1.35; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.metric-value { font-size: max(20px, calc(32 * var(--rpx))); }
+.overview-primary, .overview-secondary, .overview-warning { font-size: max(14px, calc(26 * var(--rpx))); overflow-wrap: anywhere; }
+.dialog-kicker, .burst-tag, .burst-flag, .burst-tip { flex-shrink: 0; font-size: max(12px, calc(23 * var(--rpx))); }
+.dialog-title, .burst-title { flex-shrink: 0; font-size: max(20px, calc(36 * var(--rpx))); }
+.dialog-footer, .dialog-cancel, .burst-head { flex-shrink: 0; }
+.dialog-content-scroll, .burst-scroll { flex: 1 1 auto; max-height: none; }
+.dialog-button, .dialog-option, .burst-option { font-size: max(14px, calc(27 * var(--rpx))); }
+.content-stack { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+.nameselect-scroll { scroll-padding-bottom: 20px; }
 #toast { position: fixed; z-index: 200; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: min(88vw, 430px); padding: 12px 18px; border-radius: 14px; color: #fff; background: #233252; font-size: 14px; pointer-events: none; opacity: 0; }
 #toast.mobile-toast-visible { opacity: 1; }
 @media (max-width: 340px) { .nameselect-scroll { padding-left: 14px; padding-right: 14px; } .career-rank { font-size: 25px; } .board-button { padding-left: 6px; padding-right: 6px; } }
+@media (max-width: 380px) {
+  .metric-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .metric { width: auto; min-height: 106px; }
+}
+@media (max-width: 359px) {
+  .mission-actions { flex-direction: column; }
+  .mission-actions .primary-button { width: 100%; flex: none; }
+  .promotion-button { flex-direction: row; align-items: center; padding: 12px 16px; }
+  .promotion-status { margin-top: 0; }
+}
 @media (orientation: landscape) and (max-height: 500px) { .dialog-card, .burst-card, .nameselect-card { max-height: calc(100dvh - 24px); } .nameselect-card { height: calc(100dvh - 24px); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

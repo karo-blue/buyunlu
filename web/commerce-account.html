@@ -1,0 +1,21 @@
+<section id="commerce-account" class="commerce-mask" role="dialog" aria-modal="true" aria-labelledby="commerce-title" hidden>
+  <div class="commerce-card">
+    <button id="commerce-close" class="commerce-close" type="button" aria-label="关闭购卡账号窗口">关闭</button>
+    <h2 id="commerce-title">登录购卡账号</h2><p>账号用于保存付费广告卡余额。游戏角色和本机存档保持不变。</p>
+    <p id="commerce-current" hidden></p><button id="commerce-logout" type="button" hidden>退出当前购卡账号</button>
+    <form id="commerce-login-form">
+      <label for="commerce-username">用户名</label><input id="commerce-username" autocomplete="username" pattern="[A-Za-z0-9_]{3,24}" minlength="3" maxlength="24" required>
+      <small>3～24 位英文字母、数字或下划线</small>
+      <div id="commerce-email-field" hidden><label for="commerce-email">验证邮箱</label><input id="commerce-email" type="email" autocomplete="email" maxlength="254" disabled></div>
+      <label for="commerce-password">密码</label><input id="commerce-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required><small>10～128 位；请妥善保存，当前不支持自助找回。</small>
+      <button id="commerce-submit" class="commerce-primary" type="submit">登录</button><button id="commerce-toggle" type="button">没有账号？注册</button>
+    </form>
+    <form id="commerce-verify-form" hidden>
+      <label for="commerce-verify-email">验证邮箱</label><input id="commerce-verify-email" type="email" autocomplete="email" maxlength="254" required>
+      <button id="commerce-send" type="button">发送验证码</button>
+      <label for="commerce-code">邮箱验证码</label><input id="commerce-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required>
+      <button id="commerce-verify-submit" class="commerce-primary" type="submit">验证并继续</button>
+    </form>
+    <p id="commerce-status" role="status" aria-live="polite"></p><p id="commerce-error" role="alert"></p>
+  </div>
+</section>

@@ -1,0 +1,17 @@
+{
+  "name": "buyunlu-web-server",
+  "version": "1.0.6",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "alipay-sdk": "4.14.0",
+    "nodemailer": "10.1.1"
+  },
+  "license": "SEE LICENSE IN ../LICENSE",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js"
+  }
+}
