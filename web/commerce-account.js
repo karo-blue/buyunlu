@@ -44,6 +44,7 @@
     byId('commerce-email-field').hidden = !registering;
     byId('commerce-email').disabled = !registering; byId('commerce-email').required = registering;
     byId('commerce-password').autocomplete = registering ? 'new-password' : 'current-password';
+    byId('commerce-password').maxLength = registering ? 20 : 128;
     byId('commerce-submit').textContent = registering ? '注册并发送验证码' : '登录';
     byId('commerce-toggle').textContent = registering ? '已有账号？登录' : '没有账号？注册';
   });

@@ -27,7 +27,7 @@
     if (!order) byId('order-amount').textContent = byId('order-total').textContent = units === null ? '—' : '¥' + units.toFixed(2);
     payButton.hidden = paid || !user?.emailVerified;
     payButton.disabled = busy || !available || !active;
-    payButton.textContent = busy ? '正在处理…' : status?.enabled && !modeAvailable() ? '请在电脑端购买' : !available ? '支付待开通' : order ? active ? '继续支付宝付款' : '订单已结束' : units === null ? '请输入整数金额' : '支付宝支付 ¥' + units.toFixed(2);
+    payButton.textContent = busy ? '正在处理…' : status?.enabled && !modeAvailable() ? '请在电脑端购买' : !available ? status?.testOnly ? '测试购买未开放' : '支付暂不可用' : order ? active ? '继续支付宝付款' : '订单已结束' : units === null ? '请输入整数金额' : '支付宝支付 ¥' + units.toFixed(2);
     payButton.setAttribute('aria-busy', String(busy));
     checkButton.hidden = !order || paid; checkButton.disabled = busy;
     checkButton.textContent = busy ? '正在查询…' : '我已支付，查询结果';
@@ -90,14 +90,14 @@
     try {
       status = await api('/pay/status');
       if (status.testOnly) { amountInput.value = '1'; byId('amount-help').textContent = '本次仅开放 1 元购买 10 张的支付验证。'; }
-      byId('alipay-state').textContent = status.enabled ? status.sandbox ? '沙箱测试' : '已开通' : '待开通';
+      byId('alipay-state').textContent = status.enabled ? status.sandbox ? '沙箱测试' : '已开通' : status.testOnly ? '限指定账号测试' : '暂不可用';
       notice.textContent = status.enabled ? status.sandbox ? '当前为支付宝沙箱环境，不进行真实收款。' : '点击付款后前往支付宝收银台，支付结果以服务器确认为准。' : status.reason;
       try { user = (await api('/account')).user; } catch (cause) { if (cause.status !== 401) throw cause; }
       if (!user?.emailVerified) {
         const orderId = new URLSearchParams(location.search).get('order');
         byId('payment-login').href = './?checkout=1' + (orderId && /^[A-Za-z0-9]{20,64}$/.test(orderId) ? '&order=' + orderId : '');
         byId('purchase-account').textContent = user ? '请先验证邮箱' : '尚未登录';
-        byId('payment-login').hidden = false; byId('payment-login').textContent = user ? '验证邮箱后购买' : '登录后购买'; render(); return;
+        byId('payment-login').hidden = false; byId('payment-login').textContent = user ? '验证邮箱后购买' : '登录或注册后购买'; render(); return;
       }
       byId('purchase-account').textContent = user.username;
       byId('card-balance').textContent = (await api('/pay/balance')).balance + ' 张';

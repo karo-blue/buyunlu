@@ -34,6 +34,19 @@ test('missing config disables payment and cannot create orders', t => {
   assert.throws(() => payments.createOrder(user, { requestId: requestId(), quantity: 1, mode: 'page' }), /尚未开通/);
 });
 
+test('public purchasing has no username allowlist and accepts both signed website payment modes', t => {
+  const { payments } = fixture(t, { config: { ...config, testUsernames: [] } });
+  assert.equal(payments.status().enabled, true);
+  assert.equal(payments.status().testOnly, false);
+  for (const [username, mode] of [['中文玩家', 'wap'], ['other_player', 'page']]) {
+    const buyer = { ...user, id: username, username };
+    assert.equal(payments.status(buyer).enabled, true);
+    const order = payments.createOrder(buyer, { requestId: requestId(), quantity: 1, mode });
+    assert.equal(order.amount, '1.00'); assert.equal(order.cards, 10);
+    assert.match(new URL(order.payUrl).searchParams.get('method'), mode === 'wap' ? /wap/ : /page/);
+  }
+});
+
 test('limited live verification only permits its named verified account and one-yuan orders', t => {
   const testUser = { ...user, username: 'payment_tester' };
   const { payments } = fixture(t, { config: { ...config, testUsernames: ['payment_tester'] } });

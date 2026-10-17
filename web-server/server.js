@@ -191,7 +191,9 @@ function createServer(options = {}) {
         const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : '';
         const password = body.password;
         const email = route === '/register' ? normalizeEmail(body.email) : '';
-        if (!/^[a-z0-9_]{3,24}$/.test(username) || typeof password !== 'string' || password.length < 10 || password.length > 128) throw error(400, '用户名为3～24位字母、数字或下划线；密码为10～128位');
+        if (!/^[a-z0-9_\u4e00-\u9fff]{2,24}$/.test(username)) throw error(400, '用户名为2～24位中文、字母、数字或下划线');
+        // Retain login compatibility for existing passwords above the new registration limit.
+        if (typeof password !== 'string' || password.length < 8 || password.length > (route === '/register' ? 20 : 128)) throw error(400, route === '/register' ? '密码为8～20位' : '密码至少8位；已有长密码仍可登录');
         rateLimit('user:' + username, 15);
         if (passwordWork >= 4) throw error(429, '系统繁忙，请稍后重试');
         let account = accounts.find(item => item.username === username);

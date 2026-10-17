@@ -42,6 +42,29 @@ async function fixture(t, options = {}) {
   return { request, directory, forwarded, messages, verified, advance: milliseconds => { now += milliseconds; }, restart: async () => { await close(); await start(); } };
 }
 
+test('Chinese usernames and 8 to 20 character registration passwords work while invalid input is rejected', async t => {
+  const { request } = await fixture(t);
+  for (const [username, password, email] of [['步云', '12345678', 'short@example.test'], ['中文玩家_1', 'x'.repeat(20), 'long@example.test']]) {
+    const registered = await request('/register', { username, password, email });
+    assert.equal(registered.status, 201);
+    assert.equal(registered.body.user.username, username);
+    assert.equal((await request('/login', { username, password })).status, 200);
+  }
+  for (const password of ['x'.repeat(7), 'x'.repeat(21)]) {
+    assert.equal((await request('/register', { username: '无效玩家', password, email: 'invalid@example.test' })).status, 400);
+  }
+  for (const username of ['中', '玩家<script>', '玩家 名']) {
+    assert.equal((await request('/register', { username, password: '12345678', email: 'invalid@example.test' })).status, 400);
+  }
+});
+
+test('existing passwords longer than the new registration limit can still log in', async t => {
+  const password = 'legacy-password-longer-than-twenty', salt = crypto.randomBytes(16).toString('hex');
+  const account = { id: 'legacy-long-password', username: 'legacy_player', salt, digest: crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex'), emailVerified: true };
+  const { request } = await fixture(t, { accounts: [account] });
+  assert.equal((await request('/login', { username: account.username, password })).status, 200);
+});
+
 test('subdirectory accounts use scoped cookies and retain payment origin checks', async t => {
   const { request, verified } = await fixture(t, { basePath: '/buyunlu/' });
   assert.equal((await request('/health')).status, 200);
