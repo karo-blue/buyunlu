@@ -504,3 +504,89 @@ test('hourly IP send limit applies across different accounts', async t => {
   assert.equal(denied.cookie, null);
   assert.equal(messages.length, 10);
 });
+
+
+test('registered verified email code login preserves identity and is single-use across restart',async t=>{
+ const f=await fixture(t,{payments:{status:()=>({ok:true}),balance:user=>user.id}});
+ const account=await f.verified();await f.request('/logout',{},account.cookie);
+ const sent=await f.request('/login/email/send',{email:'PLAYER_A@EXAMPLE.TEST'});
+ assert.equal(sent.status,200);assert.equal(sent.cookie,null);assert.equal(sent.body.user,undefined);
+ const code=f.messages.at(-1).code;assert.equal(f.messages.at(-1).purpose,'login');
+ const contents=fs.readFileSync(path.join(f.directory,'accounts.json'),'utf8');
+ assert.equal(contents.includes('"'+code+'"'),false);
+ await f.restart();
+ const login=await f.request('/login/email/verify',{email:'player_a@example.test',code});
+ assert.equal(login.status,200);assert.equal(login.body.user.id,account.body.user.id);
+ assert.equal((await f.request('/pay/balance',undefined,login.cookie)).body.balance,account.body.user.id);
+ await f.restart();assert.equal((await f.request('/account',undefined,login.cookie)).status,200);
+ assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code})).status,400);
+ assert.equal(JSON.parse(fs.readFileSync(path.join(f.directory,'accounts.json'),'utf8')).length,1);
+});
+
+test('code login does not create accounts or send to unknown and unverified addresses',async t=>{
+ const f=await fixture(t);await f.request('/register',{username:'unverified',password:'12345678',email:'unverified@example.test'});
+ const count=f.messages.length;
+ for(const email of ['missing@example.test','unverified@example.test']){
+  const result=await f.request('/login/email/send',{email});assert.equal(result.status,200);assert.equal(result.cookie,null);
+  const invalid=await f.request('/login/email/verify',{email,code:'123456'});assert.equal(invalid.status,400);assert.equal(invalid.cookie,null);
+ }
+ assert.equal(f.messages.length,count);assert.equal(JSON.parse(fs.readFileSync(path.join(f.directory,'accounts.json'),'utf8')).length,1);
+});
+
+test('login codes expire, cannot use registration codes and lock after five wrong guesses',async t=>{
+ const f=await fixture(t);await f.verified();const registerCode=f.messages[0].code;
+ assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code:registerCode})).status,400);
+ await f.request('/login/email/send',{email:'player_a@example.test'});let code=f.messages.at(-1).code;
+ const wrong=code==='000000'?'111111':'000000';
+ for(let i=0;i<5;i++)assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code:wrong})).status,400);
+ await f.restart();assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code})).status,429);
+ f.advance(60000);assert.equal((await f.request('/login/email/send',{email:'player_a@example.test'})).status,200);code=f.messages.at(-1).code;
+ f.advance(10*60000);assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code})).status,400);
+});
+
+test('login send cooldown survives restart, codes are superseded, and concurrent proof wins once',async t=>{
+ const f=await fixture(t);await f.verified();
+ await f.request('/login/email/send',{email:'player_a@example.test'});const first=f.messages.at(-1).code;
+ assert.equal((await f.request('/login/email/send',{email:'player_a@example.test'})).status,429);
+ await f.restart();assert.equal((await f.request('/login/email/send',{email:'player_a@example.test'})).status,429);
+ f.advance(60000);assert.equal((await f.request('/login/email/send',{email:'player_a@example.test'})).status,200);
+ const code=f.messages.at(-1).code;
+ if(first!==code)assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code:first})).status,400);
+ const results=await Promise.all([1,2].map(()=>f.request('/login/email/verify',{email:'player_a@example.test',code})));
+ assert.deepEqual(results.map(item=>item.status).sort(),[200,400]);
+});
+
+test('login email failures retain a usable prior code and never expose SMTP details',async t=>{
+ let fail=false;const f=await fixture(t,{send:()=>{if(fail)throw new Error('PRIVATE SMTP detail');}});await f.verified();
+ await f.request('/login/email/send',{email:'player_a@example.test'});const code=f.messages.at(-1).code;
+ f.advance(60000);fail=true;
+ const failed=await f.request('/login/email/send',{email:'player_a@example.test'});
+ assert.equal(failed.status,503);assert.doesNotMatch(failed.body.error,/PRIVATE/);assert.equal(failed.cookie,null);
+ assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code})).status,200);
+});
+
+test('failed account and session writes cannot acknowledge code login or leave reusable successful codes',async t=>{
+ const f=await fixture(t);await f.verified();await f.request('/login/email/send',{email:'player_a@example.test'});
+ const code=f.messages.at(-1).code,rename=fs.renameSync;
+ fs.renameSync=function(from,to){if(to===path.join(f.directory,'accounts.json'))throw new Error('full');return rename.apply(this,arguments);};
+ try{assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code})).status,500);}finally{fs.renameSync=rename;}
+ fs.renameSync=function(from,to){if(to===path.join(f.directory,'sessions.json'))throw new Error('full');return rename.apply(this,arguments);};
+ try{const result=await f.request('/login/email/verify',{email:'player_a@example.test',code});assert.equal(result.status,500);assert.equal(result.cookie,null);}finally{fs.renameSync=rename;}
+ await f.restart();assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code})).status,400);
+});
+
+test('successful code login cannot reset the hourly send limit across restarts',async t=>{
+ const f=await fixture(t);await f.verified();
+ for(let i=0;i<5;i++){
+  assert.equal((await f.request('/login/email/send',{email:'player_a@example.test'})).status,200);
+  assert.equal((await f.request('/login/email/verify',{email:'player_a@example.test',code:f.messages.at(-1).code})).status,200);
+  await f.restart();f.advance(60000);
+ }
+ assert.equal((await f.request('/login/email/send',{email:'player_a@example.test'})).status,429);
+});
+test('login email IP quota also covers addresses that are not registered',async t=>{
+ const f=await fixture(t);
+ for(let i=0;i<10;i++)assert.equal((await f.request('/login/email/send',{email:'unknown'+i+'@example.test'})).status,200);
+ assert.equal((await f.request('/login/email/send',{email:'other@example.test'})).status,429);
+ assert.equal(f.messages.length,0);assert.equal(fs.existsSync(path.join(f.directory,'accounts.json')),false);
+});

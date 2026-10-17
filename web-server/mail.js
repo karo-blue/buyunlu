@@ -67,17 +67,18 @@ function createMailer({ env = process.env, createTransport, timeoutMs = 9500 } =
   }
   return {
     verify() { return run(transport => transport.verify()); },
-    async sendVerificationEmail({ email, code, username }) {
+    async sendVerificationEmail({ email, code, username, purpose = 'verify' }) {
       if (!validEmail(email)) throw mailError('INVALID_EMAIL', '邮箱格式不正确。');
       if (!/^\d{6}$/.test(code)) throw mailError('INVALID_CODE', '验证码格式不正确。');
-      if (typeof username !== 'string' || !/^[A-Za-z0-9_]{3,24}$/.test(username)) {
+      if (typeof username !== 'string' || !(purpose === 'login' ? /^[A-Za-z0-9_\u4e00-\u9fff]{2,24}$/ : /^[A-Za-z0-9_]{3,24}$/).test(username)) {
         throw mailError('INVALID_USERNAME', '用户名格式不正确。');
       }
+      const label = purpose === 'login' ? '登录验证码' : '邮箱验证码';
       return run(async (transport, from, site) => {
         const result = await transport.sendMail({
           from: { name: '步云录', address: from }, to: { address: email },
-          envelope: { from, to: [email] }, subject: '步云录邮箱验证码',
-          text: `${username}，你好：\n\n你的步云录邮箱验证码是：${code}\n\n验证码 10 分钟内有效，请勿转发或提供给他人。\n如果不是你本人操作，请忽略此邮件。\n\n步云录${site ? ' ' + site : ''}`
+          envelope: { from, to: [email] }, subject: '步云录' + label,
+          text: `${username}，你好：\n\n你的步云录${label}是：${code}\n\n验证码 10 分钟内有效，请勿转发或提供给他人。\n如果不是你本人操作，请忽略此邮件。\n\n步云录${site ? ' ' + site : ''}`
         });
         if (!result || !Array.isArray(result.accepted) || !result.accepted.some(address => String(address).toLowerCase() === email.toLowerCase())) {
           throw mailError('SMTP_FAILED', '验证码发送失败，请稍后重试。');

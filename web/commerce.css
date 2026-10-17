@@ -11,3 +11,9 @@
 .commerce-card .commerce-close { width: auto; float: right; margin: 0 0 8px 12px; }
 #commerce-error { color: #ab3434; overflow-wrap: anywhere; }
 #commerce-error:empty, #commerce-status:empty { display: none; }
+
+.commerce-login-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; margin: 12px 0 8px; border-radius: 12px; background: #f0f4fa; }
+.commerce-login-modes button { margin: 0; min-height: 44px; background: transparent; color: #5e6d82; }
+.commerce-login-modes [aria-pressed=true] { color: #315bc4; background: white; box-shadow: 0 2px 8px #2539560a; }
+.commerce-code-row { display: grid; grid-template-columns: minmax(0, 1fr) 108px; align-items: center; gap: 8px; }
+.commerce-code-row button { margin: 0; font-size: 13px; }

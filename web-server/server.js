@@ -127,8 +127,8 @@ function createServer(options = {}) {
     if (reservedEmails.has(email)) throw error(409, '该邮箱正在发送验证码，请稍后重试');
     reservedEmails.add(email);
   }
-  async function newChallenge(user, email, ip) {
-    const previous = user.emailVerification;
+  async function newChallenge(user, email, ip, purpose = 'verify') {
+    const previous = purpose === 'login' ? user.emailLogin : user.emailVerification;
     const timestamp = now();
     if (previous?.sentAt + RESEND_DELAY > timestamp) throw Object.assign(error(429, '验证码刚刚发送，请稍后重试'), { retryAfter: Math.ceil((previous.sentAt + RESEND_DELAY - timestamp) / 1000) });
     const sameWindow = previous && previous.sendWindowStart + 3600000 > timestamp;
@@ -138,9 +138,9 @@ function createServer(options = {}) {
     rateLimit('email-address:' + email, 5, 3600000);
     const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
     const salt = crypto.randomBytes(16).toString('hex');
-    const challenge = { codeHash: hash(user.id + ':' + salt + ':' + code), salt, expiresAt: timestamp + VERIFICATION_AGE, sentAt: timestamp, attempts: 0,
+    const challenge = { codeHash: hash((purpose === 'login' ? 'login:' : '') + user.id + ':' + salt + ':' + code), salt, expiresAt: timestamp + VERIFICATION_AGE, sentAt: timestamp, attempts: 0,
       sendWindowStart: sameWindow ? previous.sendWindowStart : timestamp, sendCount: sameWindow ? previous.sendCount + 1 : 1 };
-    try { await sendVerificationEmail({ email, code, username: user.username }); }
+    try { await sendVerificationEmail({ email, code, username: user.username, ...(purpose === 'login' ? { purpose } : {}) }); }
     catch { throw error(503, '验证邮件暂时发送失败，请稍后重试'); }
     return challenge;
   }
@@ -251,6 +251,41 @@ function createServer(options = {}) {
         } else if (!account || !crypto.timingSafeEqual(Buffer.from(digest, 'hex'), Buffer.from(account.digest, 'hex'))) throw error(401, '用户名或密码错误');
         setSession(response, account, request);
         return json(response, route === '/register' ? 201 : 200, accountResponse(account));
+      }
+      if (['/login/email/send', '/login/email/verify'].includes(route) && request.method === 'POST') {
+        const sending = route.endsWith('/send');
+        rateLimit((sending ? 'email-login-send-ip:' : 'email-login-verify-ip:') + ip, sending ? 10 : 60, sending ? 3600000 : 15 * 60000);
+        const body = await bodyOf(request), email = normalizeEmail(body.email);
+        const account = accounts.find(item => item.emailVerified === true && String(item.email || '').toLowerCase() === email);
+        if (sending) {
+          rateLimit('email-login-address:' + email, 5, 3600000);
+          rateLimit('email-login-cooldown:' + email, 1, RESEND_DELAY);
+          if (account) await withAccountLock(account, async () => {
+            const challenge = await newChallenge(account, email, ip, 'login');
+            const previous = account.emailLogin;
+            account.emailLogin = challenge;
+            try { persistAccounts(); } catch (cause) { account.emailLogin = previous; throw cause; }
+          });
+          // Do not reveal registration state or create an account from a login request.
+          return json(response, 200, { ok: true, retryAfter: 60, message: '若该邮箱已注册并完成验证，登录验证码将发送至邮箱，10分钟内有效。' });
+        }
+        const invalid = () => error(400, '邮箱或验证码无效、已使用或已过期，请重新发送');
+        if (!account) throw invalid();
+        return await withAccountLock(account, async () => {
+          const challenge = account.emailLogin;
+          if (!challenge || challenge.used || challenge.expiresAt <= now()) throw invalid();
+          if (challenge.attempts >= 5) throw error(429, '验证码尝试次数过多，请重新发送');
+          const code = typeof body.code === 'string' ? body.code.trim() : '';
+          if (!/^\d{6}$/.test(code) || !crypto.timingSafeEqual(Buffer.from(challenge.codeHash, 'hex'), Buffer.from(hash('login:' + account.id + ':' + challenge.salt + ':' + code), 'hex'))) {
+            challenge.attempts++; persistAccounts(); throw invalid();
+          }
+          // Persist single use before granting a session. Retain send limits across
+          // successful logins and restarts, but remove the now-useless code digest.
+          account.emailLogin = { ...challenge, used: true }; delete account.emailLogin.codeHash;
+          try { persistAccounts(); } catch (cause) { account.emailLogin = challenge; throw cause; }
+          setSession(response, account, request);
+          return json(response, 200, accountResponse(account));
+        });
       }
       if (!user) throw error(401, '请先登录');
       rateLimit('api:' + user.id, 240, 60000);

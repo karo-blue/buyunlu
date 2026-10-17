@@ -56,4 +56,14 @@ test('GitHub frontend sessions work without third-party cookies and reject other
   const emailToken=emailLogin.headers.get('x-buyunlu-session');
   assert.match(emailToken,/^[A-Za-z0-9_-]{43}$/);
   assert.equal((await (await call('/account',undefined,emailToken)).json()).user.username,'web_tester');
+  const identity=(await (await call('/account',undefined,emailToken)).json()).user.id;
+  const sent=await call('/login/email/send',{email:'TESTER@EXAMPLE.TEST'});
+  assert.equal(sent.status,200);assert.equal(sent.headers.get('set-cookie'),null);
+  const otp=await call('/login/email/verify',{email:'tester@example.test',code});
+  assert.equal(otp.status,200);assert.equal((await otp.json()).user.id,identity);
+  const otpToken=otp.headers.get('x-buyunlu-session');assert.match(otpToken,/^[A-Za-z0-9_-]{43}$/);
+  assert.equal(otp.headers.get('set-cookie'),null);
+  await restart();assert.equal((await call('/account',undefined,otpToken)).status,200);
+  assert.equal((await call('/account',undefined,otpToken,'https://evil.example')).status,401);
+
 });

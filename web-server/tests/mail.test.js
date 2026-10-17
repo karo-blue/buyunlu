@@ -109,3 +109,10 @@ test('the real SMTP socket is destroyed at the overall deadline', async t => {
   await closed;
   assert.equal(socket.destroyed, true);
 });
+
+test('login email is clearly identified and supports registered legacy Chinese usernames',async()=>{
+ let message;
+ const mailer=createMailer({env,createTransport:()=>({sendMail:async value=>{message=value;return {accepted:[value.to.address]};},close(){}})});
+ await mailer.sendVerificationEmail({email:'player@example.test',code:'123456',username:'原有玩家',purpose:'login'});
+ assert.match(message.subject,/登录验证码/);assert.match(message.text,/登录验证码/);assert.match(message.text,/123456/);
+});
