@@ -180,7 +180,7 @@ test('bundle boots actual game offline, opens naming, saves/restores and grants 
   assert.equal(restored.data.nameSelect.visible, true);
 });
 
-function cardApp(saved = new Map()) {
+function cardApp(saved = new Map(), options = {}) {
   const result = build();
   const { doc, root } = dom();
   let blocked = false;
@@ -194,6 +194,7 @@ function cardApp(saved = new Map()) {
   doc.querySelectorAll = () => [];
   ctx.window = ctx;
   vm.createContext(ctx);
+  if (options.legacyStrings) vm.runInContext('String.prototype.replaceAll = undefined', ctx);
   for (const file of ['runtime.js', 'offline.js', 'game.js']) vm.runInContext(fs.readFileSync(path.join(result.output, file), 'utf8'), ctx);
   return { page: ctx.buyunluPage, ctx, root, saved, blockWrites(value) { blocked = value; } };
 }
@@ -287,4 +288,25 @@ test('one local card gives one reward, and failed storage or blocked rewards nev
   assert.equal(rewarded, 0);
   app.saved.set('buyunlu_mobile_cards_v1', '"corrupt"');
   assert.equal(page.cardBalance(), 0);
+});
+
+test('web game boots and plays without newer String.replaceAll support', () => {
+  const app = cardApp(new Map(), { legacyStrings: true });
+  const page = app.page;
+  assert.equal(page.data.nameSelect.visible, true);
+  const name = page.data.nameSelect.groups[0].names[0];
+  page.selectPresetName({ currentTarget: { dataset: { name } } });
+  page.confirmName();
+  assert.equal(page.data.state.name, name);
+  page.showPromotionPath();
+  assert.ok(page.data.dialog.items.some(item => item.includes('免费')));
+  page.closeDialog();
+  page.buyAdCard(10);
+  assert.equal(page.cardBalance(), 10);
+  assert.match(page.data.dialog.title, /免费购买成功/);
+  page.closeDialog();
+  page.startQuarter();
+  assert.ok(page.data.currentEvent.title);
+  page.onHide();
+  assert.ok(app.saved.has('buyunlu_save_v1'));
 });

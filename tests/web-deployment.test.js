@@ -20,6 +20,10 @@ test('committed web distribution rebuilds exactly from the public source', () =>
     for (const file of expected) assert.deepEqual(fs.readFileSync(path.join(root, 'docs', file)), fs.readFileSync(path.join(output, file)), file);
     const html = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
     assert.match(html, /connect-src 'none'/);
+    const version = require('../package.json').version;
+    const assets = [...html.matchAll(/(?:src|href)="([^"]+)"/g)];
+    assert.equal(assets.length, 4);
+    for (const [, asset] of assets) assert.equal(new URL(asset, 'https://example.invalid/').searchParams.get('v'), version, asset);
     assert.doesNotMatch(html, /(?:src|href)=["'](?:https?:|\/)/);
     assert.equal(fs.readFileSync(path.join(output, 'LICENSE'), 'utf8'), fs.readFileSync(path.join(root, 'LICENSE'), 'utf8'));
     assert.doesNotMatch(expected.join('\n'), /android|\.apk|\.env|private|\.key|\.pem|\.db|save|leaderboard\.json/i);

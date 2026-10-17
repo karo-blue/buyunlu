@@ -4,7 +4,9 @@
 
 从 GitHub Releases 下载 `buyunlu-web.zip`，解压后用 Chrome / Edge 打开 `index.html`。下载整个仓库时，入口为 `docs/index.html`。全部网页资源已附带，首次打开不需要下载依赖、编译、登录或使用微信开发者工具。
 
-手机浏览器建议使用部署后的网址打开。
+iPhone / iPad 请用 Safari 打开 https://karo-blue.github.io/buyunlu/ 或自己的部署网址。请勿把下载 ZIP、在“文件”App 中预览 HTML、或安装 APK 当作 iOS 的运行方式。
+
+网页已经移除启动阶段对 String.replaceAll 的依赖。iOS / Safari 真机仍需结合具体系统版本验证，手机浏览器建议使用部署后的网址打开。
 
 ## 部署到网站
 

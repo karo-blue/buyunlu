@@ -56,6 +56,7 @@ function listJs(directory) {
 function build(options = {}) {
   const source = path.resolve(options.source || path.join(__dirname, '..'));
   const output = path.resolve(options.output || path.join(source, 'docs'));
+  const assetVersion = encodeURIComponent(JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8')).version);
   const template = mobileTemplate(parseWxml(fs.readFileSync(path.join(source, 'pages/index/index.wxml'), 'utf8')));
   const files = [...listJs(path.join(source, 'game')), ...['storage', 'leaderboard', 'leaderboard-api', 'virtual-pay'].map(name => path.join(source, `services/${name}.js`)), path.join(source, 'pages/index/index.js')];
   const entries = files.map(file => {
@@ -74,7 +75,7 @@ function build(options = {}) {
   fs.writeFileSync(path.join(output, 'template.json'), JSON.stringify(template));
   for (const name of ['runtime.js', 'offline.js']) fs.copyFileSync(path.join(__dirname, name), path.join(output, name));
   fs.writeFileSync(path.join(output, 'style.css'), convertCss(fs.readFileSync(path.join(source, 'pages/index/index.wxss'), 'utf8')) + '\n' + fs.readFileSync(path.join(__dirname, 'mobile.css'), 'utf8'));
-  fs.writeFileSync(path.join(output, 'index.html'), `<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#eef3ff"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'"><title>步云录 · 网页版</title><link rel="stylesheet" href="style.css"></head><body><main id="app" aria-label="步云录游戏"></main><div id="toast" role="status" aria-live="polite"></div><noscript>请启用 JavaScript 以运行离线游戏。</noscript><script src="runtime.js"></script><script src="offline.js"></script><script src="game.js"></script></body></html>\n`);
+  fs.writeFileSync(path.join(output, 'index.html'), `<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#eef3ff"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'"><title>步云录 · 网页版</title><link rel="stylesheet" href="style.css?v=${assetVersion}"></head><body><main id="app" aria-label="步云录游戏"></main><div id="toast" role="status" aria-live="polite"></div><noscript>请启用 JavaScript 以运行离线游戏。</noscript><script src="runtime.js?v=${assetVersion}"></script><script src="offline.js?v=${assetVersion}"></script><script src="game.js?v=${assetVersion}"></script></body></html>\n`);
   fs.copyFileSync(path.join(source, 'LICENSE'), path.join(output, 'LICENSE'));
   fs.copyFileSync(path.join(source, 'PRIVACY.md'), path.join(output, 'PRIVACY.md'));
   fs.copyFileSync(path.join(source, 'THIRD_PARTY_NOTICES.md'), path.join(output, 'THIRD_PARTY_NOTICES.md'));

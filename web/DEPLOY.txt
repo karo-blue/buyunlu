@@ -1,6 +1,9 @@
-步云录 · 网页即用部署包 1.0.3（2026-10-17）
+步云录 · 网页即用部署包 1.0.4（2026-10-17）
 
-直接游玩：解压全部文件，用 Chrome / Edge 打开 index.html。
+iPhone / iPad：用 Safari 打开 https://karo-blue.github.io/buyunlu/ 或自己部署的网址。
+请勿在“文件”App 预览本地 HTML，也不要安装 APK。
+
+电脑直接游玩：解压全部文件，用 Chrome / Edge 打开 index.html。
 网站部署：将本包全部文件上传到静态网站目录，首页设为 index.html。
 无需微信开发者工具、AppID、npm 安装或编译，不要只上传 HTML 文件。
 支持网站根目录和子路径；手机浏览器建议通过部署后的网址打开。

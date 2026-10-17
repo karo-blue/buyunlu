@@ -7,10 +7,10 @@
   const CARD_BALANCE_KEY = 'buyunlu_mobile_cards_v1';
   const clone = value => value == null ? null : JSON.parse(JSON.stringify(value));
   function visibleText(text) {
-    return typeof text !== 'string' ? text : text.replaceAll('确认金额后请转发给好友，完成本次请求。', '确认金额后直接处理。本手机版不需要微信转发。')
-      .replaceAll('广告累计加成', '免费累计加成').replaceAll('广告不加成', '免费奖励不加成')
-      .replaceAll('全网排行榜', '本机排行榜').replaceAll('全网榜单', '本机榜单')
-      .replaceAll('公开的落马记录', '本机的落马结局记录').replaceAll('公开的出逃结局记录', '本机的出逃结局记录');
+    return typeof text !== 'string' ? text : text.replace(/确认金额后请转发给好友，完成本次请求。/g, '确认金额后直接处理。本手机版不需要微信转发。')
+      .replace(/广告累计加成/g, '免费累计加成').replace(/广告不加成/g, '免费奖励不加成')
+      .replace(/全网排行榜/g, '本机排行榜').replace(/全网榜单/g, '本机榜单')
+      .replace(/公开的落马记录/g, '本机的落马结局记录').replace(/公开的出逃结局记录/g, '本机的出逃结局记录');
   }
   function install(page, dependencies) {
     const { core, storage, host } = dependencies;
