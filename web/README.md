@@ -8,6 +8,8 @@ iPhone / iPad 请用 Safari 打开 https://karo-blue.github.io/buyunlu/ 或自�
 
 网页已经移除启动阶段对 String.replaceAll 的依赖。iOS / Safari 真机仍需结合具体系统版本验证，手机浏览器建议使用部署后的网址打开。
 
+手机页面采用紧凑布局，减少游戏卡片、商品页、购买页和账号弹窗的留白。按钮保留至少 44px 点击高度；输入框保留 16px 字号，避免 iOS 聚焦时自动放大。
+
 ## 安装到 iPhone / iPad 主屏幕
 
 1. 用 Safari 打开 https://karo-blue.github.io/buyunlu/ ，首次保持联网并等待游戏及离线资源加载完成。

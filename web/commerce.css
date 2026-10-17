@@ -1,12 +1,13 @@
 [hidden] { display: none !important; }
 .commerce-mask { position: fixed; inset: 0; z-index: 180; display: flex; align-items: center; justify-content: center; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #15254499; }
-.commerce-card { width: 100%; max-width: 420px; max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 22px; border-radius: 20px; background: #f5f8ff; color: #18213a; font-size: 15px; line-height: 1.6; }
-.commerce-card h2 { margin: 0 0 12px; font-size: 22px; }
-.commerce-card p { color: #52627b; margin: 12px 0; }
+.commerce-card { width: 100%; max-width: 420px; max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 16px; border-radius: 16px; background: #f5f8ff; color: #18213a; font-size: 14px; line-height: 1.5; }
+.commerce-card h2 { margin: 0 0 8px; font-size: 18px; }
+.commerce-card p { color: #52627b; margin: 8px 0; }
 .commerce-card small { display: block; font-size: 12px; color: #52627b; margin-top: 4px; }
-.commerce-card label { display: block; margin: 14px 0 6px; font-weight: 600; }
-.commerce-card input { width: 100%; min-width: 0; height: 48px; padding: 10px 12px; border: 1px solid #bccbe0; border-radius: 10px; font-size: 16px; color: #18213a; background: white; }
-.commerce-card button { width: 100%; min-height: 48px; margin-top: 12px; padding: 10px; border-radius: 12px; background: #e6edfd; color: #2c4ec0; font-size: 15px; }
+.commerce-card label { display: block; margin: 8px 0 4px; font-weight: 600; }
+.commerce-card input { width: 100%; min-width: 0; height: 44px; padding: 8px 10px; border: 1px solid #bccbe0; border-radius: 8px; font-size: 16px; color: #18213a; background: white; }
+.commerce-card button { width: 100%; min-height: 44px; margin-top: 8px; padding: 8px; border-radius: 10px; background: #e6edfd; color: #2c4ec0; font-size: 14px; }
 .commerce-card .commerce-primary { color: white; background: #3978e6; }
 .commerce-card .commerce-close { width: auto; float: right; margin: 0 0 8px 12px; }
 #commerce-error { color: #ab3434; overflow-wrap: anywhere; }
+#commerce-error:empty, #commerce-status:empty { display: none; }
