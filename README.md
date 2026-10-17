@@ -8,6 +8,7 @@
 
 **网页版无需微信开发者工具、AppID、账号或服务器接口。**
 
+- [打开在线网页版](https://karo-blue.github.io/buyunlu/)：手机或电脑浏览器点击即可游玩。
 - [下载网页即用部署包](https://github.com/karo-blue/buyunlu/releases/latest/download/buyunlu-web.zip)：解压后用 Chrome / Edge 打开 `index.html` 即可游玩。
 - 下载整个仓库时，直接打开 `docs/index.html`；`docs/` 已包含完整生成资源，无需先构建。
 - 部署到自己的静态网站：将部署包内全部文件上传到网站根目录，默认首页设为 `index.html`，通过网站地址访问。支持根目录或 `/buyunlu/` 等子路径。
