@@ -75,12 +75,18 @@ function build(options = {}) {
   fs.writeFileSync(path.join(output, 'template.json'), JSON.stringify(template));
   for (const name of ['runtime.js', 'offline.js']) fs.copyFileSync(path.join(__dirname, name), path.join(output, name));
   fs.writeFileSync(path.join(output, 'style.css'), convertCss(fs.readFileSync(path.join(source, 'pages/index/index.wxss'), 'utf8')) + '\n' + fs.readFileSync(path.join(__dirname, 'mobile.css'), 'utf8'));
-  fs.writeFileSync(path.join(output, 'index.html'), `<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#eef3ff"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'"><title>步云录 · 网页版</title><link rel="stylesheet" href="style.css?v=${assetVersion}"></head><body><main id="app" aria-label="步云录游戏"></main><div id="toast" role="status" aria-live="polite"></div><noscript>请启用 JavaScript 以运行离线游戏。</noscript><script src="runtime.js?v=${assetVersion}"></script><script src="offline.js?v=${assetVersion}"></script><script src="game.js?v=${assetVersion}"></script></body></html>\n`);
+  fs.writeFileSync(path.join(output, 'index.html'), `<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#eef3ff"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; worker-src 'self'; manifest-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="步云录"><title>步云录 · 网页版</title><link rel="manifest" href="manifest.webmanifest?v=${assetVersion}"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=${assetVersion}"><link rel="stylesheet" href="style.css?v=${assetVersion}"></head><body><main id="app" aria-label="步云录游戏"></main><div id="toast" role="status" aria-live="polite"></div><noscript>请启用 JavaScript 以运行离线游戏。</noscript><script src="runtime.js?v=${assetVersion}"></script><script src="offline.js?v=${assetVersion}"></script><script src="game.js?v=${assetVersion}"></script><script src="pwa.js?v=${assetVersion}"></script></body></html>\n`);
   fs.copyFileSync(path.join(source, 'LICENSE'), path.join(output, 'LICENSE'));
   fs.copyFileSync(path.join(source, 'PRIVACY.md'), path.join(output, 'PRIVACY.md'));
   fs.copyFileSync(path.join(source, 'THIRD_PARTY_NOTICES.md'), path.join(output, 'THIRD_PARTY_NOTICES.md'));
   fs.copyFileSync(path.join(__dirname, 'DEPLOY.txt'), path.join(output, '使用说明.txt'));
   fs.writeFileSync(path.join(output, '.nojekyll'), '');
+  const manifest = { id: './', name: '步云录', short_name: '步云录', lang: 'zh-CN', start_url: './', scope: './', display: 'standalone', background_color: '#edf2ff', theme_color: '#233252',
+    icons: [192, 512].map(size => ({ src: 'assets/icon-' + size + '.png', sizes: size + 'x' + size, type: 'image/png', purpose: 'any' })) };
+  fs.writeFileSync(path.join(output, 'manifest.webmanifest'), JSON.stringify(manifest, null, 2) + '\n');
+  fs.copyFileSync(path.join(__dirname, 'pwa.js'), path.join(output, 'pwa.js'));
+  fs.writeFileSync(path.join(output, 'sw.js'), fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8').replace('__BUILD_VERSION__', assetVersion));
+  for (const icon of ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join(__dirname, 'icons', icon), path.join(output, 'assets', icon));
   return { output, modules: entries.length, templateNodes: template.length };
 }
 

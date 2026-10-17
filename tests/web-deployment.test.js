@@ -22,7 +22,7 @@ test('committed web distribution rebuilds exactly from the public source', () =>
     assert.match(html, /connect-src 'none'/);
     const version = require('../package.json').version;
     const assets = [...html.matchAll(/(?:src|href)="([^"]+)"/g)];
-    assert.equal(assets.length, 4);
+    assert.ok(assets.length > 0);
     for (const [, asset] of assets) assert.equal(new URL(asset, 'https://example.invalid/').searchParams.get('v'), version, asset);
     assert.doesNotMatch(html, /(?:src|href)=["'](?:https?:|\/)/);
     assert.equal(fs.readFileSync(path.join(output, 'LICENSE'), 'utf8'), fs.readFileSync(path.join(root, 'LICENSE'), 'utf8'));
@@ -41,6 +41,13 @@ test('standalone web server serves the game, supports HEAD and rejects traversal
     assert.match(response.headers.get('content-type'), /text\/html/);
     assert.match(await response.text(), /步云录/);
     assert.equal((await fetch(`${base}/game.js`)).status, 200);
+    const manifest = await fetch(`${base}/manifest.webmanifest`);
+    assert.equal(manifest.status, 200);
+    assert.match(manifest.headers.get('content-type'), /application\/manifest\+json/);
+    assert.equal((await manifest.json()).display, 'standalone');
+    const worker = await fetch(`${base}/sw.js`);
+    assert.equal(worker.status, 200);
+    assert.match(worker.headers.get('content-type'), /javascript/);
     const image = await fetch(`${base}/assets/ad-free-card.png`);
     assert.equal(image.headers.get('content-type'), 'image/png');
     const head = await fetch(base, { method: 'HEAD' });

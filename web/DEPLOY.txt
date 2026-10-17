@@ -1,6 +1,9 @@
-步云录 · 网页即用部署包 1.0.4（2026-10-17）
+步云录 · 网页即用部署包 1.0.5（2026-10-17）
 
 iPhone / iPad：用 Safari 打开 https://karo-blue.github.io/buyunlu/ 或自己部署的网址。
+安装到主屏幕：Safari 打开网址并联网加载完成 → 分享 → 添加到主屏幕 → 添加。
+如有“作为 Web App 打开”开关请保持开启。缓存完成后可离线打开。
+这是主屏幕网页应用，不是 IPA 或 App Store 安装包。
 请勿在“文件”App 预览本地 HTML，也不要安装 APK。
 
 电脑直接游玩：解压全部文件，用 Chrome / Edge 打开 index.html。
