@@ -35,19 +35,20 @@ test('a temporary connection failure preserves the remembered session',async()=>
  await assert.rejects(api.request('/account'));assert.equal(api.hasSession(),true);
 });
 
-function fixture({store=new Map(),state,failAfterDebit=false,user=true,boards,boardRequest,slots={1:{name:"旧存档",year:2024,age:30,rankIndex:1}},saveFails=false}={}){
+function fixture({store=new Map(),state,failAfterDebit=false,user=true,boards,boardRequest,consumeRequest,slots={1:{name:"旧存档",year:2024,age:30,rankIndex:1}},saveFails=false}={}){
   let balance=10,rewards=0,debits=0,opened=0;let saved;const spent=new Set(),requests=[];
   const host={crypto,localStorage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)},wx:{showToast(){}},
     BuyunluCardAccount:{user:user?{id:'one',username:'tester',emailVerified:true}:null,ready:Promise.resolve(),open:()=>opened++,checkout:()=>opened++},
     BuyunluAPI:{request:async(route,body)=>{
       if(route.startsWith('/public/'))return boardRequest(route);
       if(route==='/pay/balance')return {balance};
+      await consumeRequest?.(body);
       requests.push(body.requestId);
       if(!spent.has(body.requestId)){spent.add(body.requestId);balance--;debits++;if(failAfterDebit){failAfterDebit=false;throw new Error('response lost');}}
       return {balance};
     }}};
   const page={data:{state:state||{year:2026,rankIndex:1,promotionAdUsedYear:2026,promotionAdWatchCount:0},dialog:{}},_payRaw:{balance:0},
-    setPay(value){this._payRaw={...this._payRaw,...value};},setData(){},showModal(options){this.data.dialog={...options,visible:true};},showActionSheet(options){this.sheet=options;},buildPatch:()=>({}),selectNav(){},startFreshGame(){},applyLoadedSlot(){},startQuarter(){}};
+    setPay(value){this._payRaw={...this._payRaw,...value};},setData(){},showModal(options){this.data.dialog={...options,visible:true};},showActionSheet(options){this.sheet=options;},buildPatch:()=>({}),selectNav(){},startFreshGame(){},applyLoadedSlot(){},startQuarter(){},tryPromotion(){this.data.state.promotionAppliedYear=this.data.state.year;}};
   const storage={KEY:'save',load:()=>saved,loadSlot:slot=>slots[slot]||null,
     slotList:()=>[1,2,3].map(slot=>({slot,empty:!slots[slot],...slots[slot]})),
     save:state=>{if(saveFails)return false;saved=JSON.parse(JSON.stringify(state));return true;}};
@@ -158,4 +159,74 @@ test('a completion receipt prevents reapplying progress when journal completion 
  install(f.page,{host:f.host,storage:f.storage});await new Promise(resolve=>setImmediate(resolve));
  await f.page.useLoadAdCard(1);
  assert.equal(f.counts().debits,1);assert.equal(f.page.data.state.year,2025);assert.equal(f.page.data.state._paidLoadRequest,receipt);
+});
+
+test('another tab switching account cannot cause a stale page to debit its new wallet',async()=>{
+ const f=fixture();await new Promise(resolve=>setImmediate(resolve));
+ f.host.BuyunluCardAccount.restore=async()=>{f.host.BuyunluCardAccount.user={id:'other',emailVerified:true};};
+ await f.use();assert.equal(f.counts().debits,0);assert.equal(f.counts().rewards,0);
+});
+
+test('account revalidation failure cannot debit and overlapping clicks issue one account-bound request',async()=>{
+ const f=fixture();await new Promise(resolve=>setImmediate(resolve));
+ f.host.BuyunluCardAccount.restore=async()=>{throw new Error('offline');};
+ await f.use();assert.equal(f.counts().debits,0);
+ let resume;f.host.BuyunluCardAccount.restore=()=>new Promise(resolve=>{resume=resolve;});
+ const first=f.use();await new Promise(resolve=>setImmediate(resolve));const second=f.use();resume();await Promise.all([first,second]);
+ assert.equal(f.counts().debits,1);assert.equal(f.counts().rewards,1);
+});
+
+test('pending review and evidence decisions are restored before advancing another quarter',()=>{
+ const offline=require('../offline');
+ for(const pending of [{pendingInterrogation:{year:2026,risk:50}},{pendingEvidenceWarning:{year:2026,stage:'choice',seed:1}}]){
+  let advanced=0,restored=0;
+  const page={data:{state:{name:'测试',...pending},dialog:{}},startQuarter(){advanced++;},maybeBurstEvent(){restored++;}};
+  offline.install(page,{core:{},storage:{},host:{wx:{}},leaderboard:{}});
+  page.startQuarter();assert.equal(advanced,0);assert.equal(restored,1);
+ }
+});
+
+test('an account change after a lost debit response retains the original receipt for later recovery',async()=>{
+ let reject=false,changed=false;
+ const f=fixture({failAfterDebit:true,consumeRequest:()=>{if(reject){changed=true;throw Object.assign(new Error('登录账号已变化'),{status:409});}}});await new Promise(resolve=>setImmediate(resolve));
+ await f.use();const pending=JSON.parse(f.store.get('buyunlu_paid_card_use:one')).request.requestId;
+ f.host.BuyunluCardAccount.restore=async()=>{if(changed&&f.host.BuyunluCardAccount.user.id!=='other'){f.host.BuyunluCardAccount.user={id:'other',emailVerified:true};f.host.BuyunluCardAccount.onChange();}};
+ reject=true;await f.use();assert.equal(JSON.parse(f.store.get('buyunlu_paid_card_use:one')).request.requestId,pending);
+ changed=false;reject=false;f.host.BuyunluCardAccount.user={id:'one',emailVerified:true};f.host.BuyunluCardAccount.onChange();
+ await f.use();assert.equal(f.counts().debits,1);assert.equal(f.counts().rewards,1);
+});
+
+test('promotion dialog exposes one consistently named paid card action and preserves the other action mapping',async()=>{
+ const f=fixture();await new Promise(resolve=>setImmediate(resolve));let used=0,selected;
+ f.page.usePromotionAdCard=()=>used++;
+ f.page.showActionSheet({title:'完整晋升路线',content:'本年度晋升申请：未使用。',itemList:['查看晋升条件','用免广告卡，晋升概率+3%（剩10张）','看广告，晋升概率+3%'],success:result=>{selected=result.tapIndex;}});
+ assert.equal(f.page.sheet.tone,'promotion');assert.equal(f.page.sheet.itemList.length,2);
+ assert.equal(f.page.sheet.itemList.filter(text=>text.includes('广告卡')).length,1);assert.equal(f.page.sheet.itemList.some(text=>text.includes('免广告卡')),false);
+ f.page.sheet.success({tapIndex:0});assert.equal(selected,0);f.page.sheet.success({tapIndex:1});assert.equal(used,1);
+});
+
+test('the unified promotion action offers purchase when there is no card and never debits',async()=>{
+ const f=fixture();await new Promise(resolve=>setImmediate(resolve));f.page.setPay({balance:0});
+ f.page.showActionSheet({title:'完整晋升路线',content:'',itemList:['查看晋升条件','看广告，晋升概率+3%']});
+ assert.equal(f.page.sheet.itemList[1],'购买广告卡');f.page.sheet.success({tapIndex:1});
+ assert.equal(f.counts().opened,1);assert.equal(f.counts().debits,0);
+});
+
+test('annual promotion already applied or a capped probability never spends another card',async()=>{
+ for(const applied of [true,false]){
+  const f=fixture();await new Promise(resolve=>setImmediate(resolve));
+  if(applied)f.page.data.state.promotionAppliedYear=2026;else f.page.data.promotionChanceText='100%';
+  await f.use();assert.equal(f.counts().debits,0);assert.equal(f.counts().rewards,0);
+  f.page.showActionSheet({title:'完整晋升路线',content:'',itemList:['查看晋升条件','用免广告卡，晋升概率+3%（剩10张）','看广告，晋升概率+3%']});
+  assert.equal(f.page.sheet.itemList.filter(text=>/广告卡/.test(text)).length,0);
+ }
+});
+
+test('a pending debit blocks promotion and remains confirmable from a capped promotion dialog',async()=>{
+ const f=fixture({failAfterDebit:true});await new Promise(resolve=>setImmediate(resolve));
+ await f.use();f.page.tryPromotion();assert.equal(f.page.data.state.promotionAppliedYear,undefined);
+ f.page.data.promotionChanceText='100%';f.page.setPay({balance:0});f.page.usePromotionAdCard=f.use;
+ f.page.showActionSheet({title:'完整晋升路线',content:'',itemList:['查看晋升条件','看广告，晋升概率+3%']});
+ const index=f.page.sheet.itemList.findIndex(text=>text.includes('确认上次用卡'));assert.ok(index>=0);
+ await f.page.sheet.success({tapIndex:index});assert.equal(f.counts().debits,1);assert.equal(f.counts().rewards,1);assert.equal(f.host.BuyunluCardAccount.canChange(),true);
 });

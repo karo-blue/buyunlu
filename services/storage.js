@@ -62,12 +62,17 @@ function addLocalHistory(type, slot, state, savedAt) {
   } catch (error) { /* 历史写入失败不影响存档本身 */ }
 }
 
+function readableSlot(item) {
+  const state = item && item.state;
+  return !!(state && typeof state === 'object' && !Array.isArray(state) && Number.isFinite(Number(state.age)) && Number(state.age) > 0);
+}
+
 function slotList() {
   const slots = readSlots();
   return Array.from({ length: SLOT_COUNT }, (_, index) => {
     const slot = index + 1;
     const item = slots[slot];
-    if (!item || !item.state) return { slot, empty: true };
+    if (!readableSlot(item)) return { slot, empty: true };
     const state = core.normalizeState(item.state);
     const rank = core.RANKS[state.rankIndex - 1] || core.RANKS[0];
     return { slot, empty: false, savedAt: item.savedAt || '', name: state.name || '未命名', year: state.year, age: state.age, rank: rank.short };
@@ -93,7 +98,7 @@ function loadSlot(slot) {
   if (!validSlot(slot)) return null;
   try {
     const item = readSlots()[slot];
-    if (!item || !item.state) return null;
+    if (!readableSlot(item)) return null;
     const state = core.normalizeState(item.state);
     addLocalHistory('load', Number(slot), state);
     return state;

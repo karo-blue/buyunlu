@@ -72,14 +72,15 @@
         let saved;
         try { saved = JSON.parse(sessionStorage.getItem(requestKey) || 'null'); } catch {}
         // Keep the request bound to its amount and channel when retrying a lost response.
+        if (saved?.accountId && saved.accountId !== user.id) throw new Error('上次下单账号已变化，请切回原账号核对订单');
         if (saved && (saved.quantity !== units || saved.mode !== mode)) throw new Error('上次下单结果尚未确认，请先按原金额重试，避免重复购买');
-        if (!saved) { saved = { requestId: crypto.randomUUID(), quantity: units, mode }; sessionStorage.setItem(requestKey, JSON.stringify(saved)); }
-        order = (await api('/pay/order', saved)).order;
+        if (!saved) { saved = { requestId: crypto.randomUUID(), quantity: units, mode, accountId: user.id }; sessionStorage.setItem(requestKey, JSON.stringify(saved)); }
+        order = (await api('/pay/order', { ...saved, accountId: user.id })).order;
         history.replaceState(null, '', 'checkout.html?order=' + order.id);
       }
       if (!order.payUrl || order.state !== 'pending') throw new Error('订单无法继续付款，请查询支付结果');
       location.assign(paymentUrl(order.payUrl));
-    } catch (cause) { byId('payment-error').textContent = cause.message || '下单失败，请重试'; }
+    } catch (cause) { if (cause.status === 409 && /账号已变化/.test(cause.message)) sessionStorage.removeItem(requestKey); byId('payment-error').textContent = cause.message || '下单失败，请重试'; }
     finally { busy = false; render(); }
   });
   amountInput.addEventListener('input', () => { agreement.checked = false; render(); });

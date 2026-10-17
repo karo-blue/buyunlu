@@ -165,3 +165,11 @@ test('sandbox money cannot become a real-money wallet by changing configuration'
   assert.throws(() => create().consume(user, { ...input, scene: 'promotion' }), /用途/);
   assert.equal(create().balance(user), 9);
  });
+
+test('a changed account cannot create an order or debit against the displayed account identity',t=>{
+ const {payments}=fixture(t);
+ const order=payments.createOrder(user,{requestId:requestId(),quantity:1,mode:'wap'});payments.notify(notice(order));
+ assert.throws(()=>payments.consume(user,{accountId:'stale-account',requestId:requestId(),scene:'load'}),/账号/);
+ assert.equal(payments.balance(user),10);
+ assert.throws(()=>payments.createOrder(user,{accountId:'stale-account',requestId:requestId(),quantity:1,mode:'wap'}),/账号/);
+});

@@ -40,6 +40,7 @@ function mobileTemplate(nodes, sharedBoards = false) {
     if (node.text != null) return { text: sharedBoards ? node.text : node.text.replaceAll('全网排行榜', '本机排行榜').replaceAll('全网榜单', '本机榜单') };
     const attrs = { ...node.attrs };
     if (attrs['open-type']) delete attrs['open-type'];
+    if (sharedBoards && attrs.class && attrs.class.startsWith('dialog-card ')) attrs.class += " {{dialog.tone === 'promotion' ? 'dialog-card-promotion' : ''}}";
     if (!sharedBoards && attrs['aria-label'] === '全网榜单') attrs['aria-label'] = '本机榜单';
     if (attrs.src === '/assets/ad-free-card.png') attrs.src = 'assets/ad-free-card.png';
     return { ...node, attrs, children: mobileTemplate(node.children, sharedBoards) };

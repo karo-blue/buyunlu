@@ -49,3 +49,18 @@ test('invalid or empty slots fail safely without replacing the current game', ()
   assert.equal(storage.slotList().length, 3);
   delete global.wx;
 });
+
+test('malformed slot payloads cannot be normalized into a new billable game', () => {
+  const local = new Map();
+  global.wx = { getStorageSync:key=>local.get(key), setStorageSync:(key,value)=>local.set(key,value) };
+  const storage = loadStorageApi();
+  try {
+    for (const state of [{}, [], 'broken', {age:'bad'}, {age:0}]) {
+      local.set(storage.SLOTS_KEY, {1:{state}});
+      assert.equal(storage.loadSlot(1),null);
+      assert.equal(storage.slotList()[0].empty,true);
+    }
+    local.set(storage.SLOTS_KEY,{1:{state:{age:30,name:'旧存档'}}});
+    assert.equal(storage.loadSlot(1).age,30,'A legitimate old state still receives missing defaults');
+  } finally { delete global.wx; }
+});

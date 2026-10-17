@@ -162,6 +162,7 @@
     page.startQuarter = (function(original) { return function() {
       if (!this.data.state.name) return this.openNameSelect();
       if (this._burstEvent) return this.setData({ 'burst.visible': true });
+      if (this.data.state.pendingEvidenceWarning || this.data.state.pendingInterrogation) return this.maybeBurstEvent();
       if (this.data.currentEvent) return host.wx.showToast({ title: '请先处理当前季度事项' });
       return original.call(this);
     }; })(page.startQuarter);

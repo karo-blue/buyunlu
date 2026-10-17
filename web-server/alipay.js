@@ -116,6 +116,7 @@ function createPayments(options) {
       reason: enabled() && allowed(user) ? '' : testOnly ? '当前仅开放指定账号的1元购买验证' : '支付宝支付尚未开通，当前不会创建订单或扣款' }),
     balance: user => ledger.wallets[user.id] || 0,
     createOrder(user, body) {
+      if (body.accountId !== undefined && body.accountId !== user.id) throw fail(409, '登录账号已变化，请刷新页面核对账号后重试');
       if (!enabled()) throw fail(503, '支付宝支付尚未开通');
       if (!allowed(user)) throw fail(403, '当前仅供指定测试账号购买');
       if (testOnly && body.quantity !== 1) throw fail(400, '本次验证仅支持1元购买10张');
@@ -154,6 +155,7 @@ function createPayments(options) {
       applyTrade(data, true);
     },
     consume(user, body) {
+      if (body.accountId !== undefined && body.accountId !== user.id) throw fail(409, '登录账号已变化，请刷新页面核对账号后重试');
       if (!validRequest(body.requestId)) throw fail(400, '用卡请求标识无效');
       if (!['promotion', 'load'].includes(body.scene)) throw fail(400, '广告卡仅支持晋升或读档用途');
       const key = user.id + ':' + body.requestId;
