@@ -353,6 +353,20 @@ test('a new-year promotion reward adds to the same career and a fresh game reset
   assert.equal(restored.cardBalance(), 8, 'unspent cards stay in the separate wallet');
 });
 
+test('career probability labels show every granted point without floating point truncation', () => {
+  const { page } = cardApp();
+  const core = require('../../game/core');
+  for (let rank = 1; rank < core.RANKS.length; rank++) for (const count of [0, 1, 2, 10, 32, 33]) {
+    Object.assign(page.data.state, { rankIndex: rank, promotionAdWatchCount: count });
+    page.refresh();
+    const expected = Math.round(core.currentPromotionChance(page.data.state, rank + 1) * 100);
+    assert.equal(page.data.promotionChanceText, `${expected}%`, `rank ${rank}, ${count} cards`);
+    page.showPromotionPath();
+    assert.ok(page.data.dialog.content.includes(`机会${expected}%`), 'route reference uses the same probability');
+    page.closeDialog();
+  }
+});
+
 test('web game boots and plays without newer String.replaceAll support', () => {
   const app = cardApp(new Map(), { legacyStrings: true });
   const page = app.page;

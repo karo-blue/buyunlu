@@ -13711,7 +13711,7 @@ function slotLabel(item) {
   return `存档 ${item.slot} · ${item.name} · ${item.year}年 · ${item.rank}${time ? ` · ${time}` : ''}`;
 }
 function shuffled(items) { const copy = items.slice(); for (let index = copy.length - 1; index > 0; index -= 1) { const swap = Math.floor(Math.random() * (index + 1)); [copy[index], copy[swap]] = [copy[swap], copy[index]]; } return copy; }
-function requirementText(state, rank, index) { return `任职满${rank.years}年　年龄≥${rank.age}　考核≥${rank.review}　口碑≥${rank.reputation}　人脉≥${rank.network}　政绩≥${rank.achievement || 0}　过失≤${(rank.faultLimit == null ? 99 : rank.faultLimit)}　机会${Math.floor(core.currentPromotionChance(state, index) * 100)}%`; }
+function requirementText(state, rank, index) { return `任职满${rank.years}年　年龄≥${rank.age}　考核≥${rank.review}　口碑≥${rank.reputation}　人脉≥${rank.network}　政绩≥${rank.achievement || 0}　过失≤${(rank.faultLimit == null ? 99 : rank.faultLimit)}　机会${Math.round(core.currentPromotionChance(state, index) * 100)}%`; }
 function positionUnlockText(state, position) { if (position.blockedReason) return '不可直接转任'; if (position.minAchievements && state.achievements < position.minAchievements) return `暂不可选·还需${position.minAchievements - state.achievements}项累计政绩`; if (position.minIntegrity && state.integrity < position.minIntegrity) return `暂不可选·廉政值需达到${position.minIntegrity}`; return '可选'; }
 function honorView(state) {
   const status = core.publicServantStatus(state);
@@ -13831,7 +13831,7 @@ Page({
         { label: '健康值', value: state.health, tone: state.health < 40 ? 'red' : 'blue' },
         { label: '落马风险', value: net.risk, tone: net.risk >= 50 ? 'red' : net.risk >= 30 ? 'gold' : 'green' },
       ],
-      promotionChanceText: state.rankIndex >= core.RANKS.length ? '已达最高职级' : `${Math.floor(core.currentPromotionChance(state, state.rankIndex + 1) * 100)}%`,
+      promotionChanceText: state.rankIndex >= core.RANKS.length ? '已达最高职级' : `${Math.round(core.currentPromotionChance(state, state.rankIndex + 1) * 100)}%`,
       promotionStatusText: state.rankIndex >= core.RANKS.length ? '已达最高职级' : state.promotionAppliedYear === state.year ? '今年已使用' : '今年未使用',
       adText: `本局生涯晋升加成：已领取${watchCount}次，累计 +${watchCount * 3}个百分点；跨年、晋升保留，重新开局清零，最终概率最高100%。`,
       navActions: navActionsFor(this.data.activeNav),
@@ -14278,10 +14278,10 @@ Page({
     if (!core.isQualified(state, next)) return wx.showToast({ title: '当前条件尚未达标', icon: 'none' });
     state.promotionAppliedYear = state.year;
     const chance = core.currentPromotionChance(state, state.rankIndex + 1);
-    if (Math.random() >= chance) { state.lastResult = '本次晋升考察暂未通过，你的任职资历会继续保留。'; core.addRecord(state, `参加${next.name}晋升考察，本次暂未通过。`); this.persist(); return this.showModal({ title: '晋升结果', content: `本次考察暂未通过。\n当前晋升机会为${Math.floor(chance * 100)}%，资历和属性不会扣除。\n继续保持良好考核，可在后续年度再次争取。`, showCancel: false }); }
+    if (Math.random() >= chance) { state.lastResult = '本次晋升考察暂未通过，你的任职资历会继续保留。'; core.addRecord(state, `参加${next.name}晋升考察，本次暂未通过。`); this.persist(); return this.showModal({ title: '晋升结果', content: `本次考察暂未通过。\n当前晋升机会为${Math.round(chance * 100)}%，资历和属性不会扣除。\n继续保持良好考核，可在后续年度再次争取。`, showCancel: false }); }
     const bonusPoints = state.promotionAdWatchCount * 3;
     const bonusText = bonusPoints > 0 ? `（含本局生涯累计加成${bonusPoints}个百分点）` : '';
-    state.rankIndex += 1; state.rankYears = 0; state.previousPosition = state.currentPosition; state.currentPosition = state.rankIndex >= 3 ? '待选择具体岗位' : '非领导职级'; state.dutyType = core.RANKS[state.rankIndex - 1].dutyType; state.lastResult = `通过竞争与考察，你迎来了新的职级变化。${bonusText}`; core.addRecord(state, `以${Math.floor(chance * 100)}%晋升机会${bonusText}晋升至${core.RANKS[state.rankIndex - 1].name}。`); this.persist(); this.choosePosition(() => this.showPromotionResult());
+    state.rankIndex += 1; state.rankYears = 0; state.previousPosition = state.currentPosition; state.currentPosition = state.rankIndex >= 3 ? '待选择具体岗位' : '非领导职级'; state.dutyType = core.RANKS[state.rankIndex - 1].dutyType; state.lastResult = `通过竞争与考察，你迎来了新的职级变化。${bonusText}`; core.addRecord(state, `以${Math.round(chance * 100)}%晋升机会${bonusText}晋升至${core.RANKS[state.rankIndex - 1].name}。`); this.persist(); this.choosePosition(() => this.showPromotionResult());
   },
 
   watchPromotionAd() {
