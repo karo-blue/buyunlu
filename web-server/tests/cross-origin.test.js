@@ -36,4 +36,10 @@ test('GitHub frontend sessions work without third-party cookies and reject other
   assert.equal((await call('/save',{revision:0,snapshot:{}},next)).status,200);
   assert.equal((await call('/logout',{},next)).status,200);
   assert.equal((await call('/account',undefined,next)).status,401);
+  const emailLogin=await call('/login',{username:'TESTER@EXAMPLE.TEST',password:'long password 123'});
+  assert.equal(emailLogin.status,200);
+  assert.equal(emailLogin.headers.get('set-cookie'),null);
+  const emailToken=emailLogin.headers.get('x-buyunlu-session');
+  assert.match(emailToken,/^[A-Za-z0-9_-]{43}$/);
+  assert.equal((await (await call('/account',undefined,emailToken)).json()).user.username,'web_tester');
 });

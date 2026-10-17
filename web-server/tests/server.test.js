@@ -42,20 +42,56 @@ async function fixture(t, options = {}) {
   return { request, directory, forwarded, messages, verified, advance: milliseconds => { now += milliseconds; }, restart: async () => { await close(); await start(); } };
 }
 
-test('Chinese usernames and 8 to 20 character registration passwords work while invalid input is rejected', async t => {
+test('registration restores ASCII usernames and keeps 8 to 20 character passwords', async t => {
   const { request } = await fixture(t);
-  for (const [username, password, email] of [['步云', '12345678', 'short@example.test'], ['中文玩家_1', 'x'.repeat(20), 'long@example.test']]) {
+  for (const [username, password, email] of [['player123', '12345678', 'short@example.test'], ['player_2', 'x'.repeat(20), 'long@example.test']]) {
     const registered = await request('/register', { username, password, email });
     assert.equal(registered.status, 201);
     assert.equal(registered.body.user.username, username);
     assert.equal((await request('/login', { username, password })).status, 200);
   }
   for (const password of ['x'.repeat(7), 'x'.repeat(21)]) {
-    assert.equal((await request('/register', { username: '无效玩家', password, email: 'invalid@example.test' })).status, 400);
+    assert.equal((await request('/register', { username: 'invalid_player', password, email: 'invalid@example.test' })).status, 400);
   }
-  for (const username of ['中', '玩家<script>', '玩家 名']) {
+  for (const username of ['ab', '中文玩家', 'player<script>', 'player name', 'email@example.test']) {
     assert.equal((await request('/register', { username, password: '12345678', email: 'invalid@example.test' })).status, 400);
   }
+});
+
+test('verified email login is case insensitive and reaches the same account and wallet as username login', async t => {
+  const { request, messages } = await fixture(t, { payments: { balance: buyer => buyer.username === 'player123' ? 17 : 0 } });
+  const fields = { username: 'player123', password: '12345678', email: 'owner@example.test' };
+  const registered = await request('/register', fields);
+  assert.equal(registered.status, 201);
+  assert.equal((await request('/login', { username: fields.email, password: fields.password })).status, 401, 'Unverified email must not identify an account');
+  const verified = await request('/email/verify', { code: messages.at(-1).code }, registered.cookie);
+  assert.equal(verified.status, 200);
+  const emailLogin = await request('/login', { username: ' Owner@Example.Test ', password: fields.password });
+  const nameLogin = await request('/login', { username: 'PLAYER123', password: fields.password });
+  assert.equal(emailLogin.status, 200); assert.equal(nameLogin.status, 200);
+  assert.equal(emailLogin.body.user.id, nameLogin.body.user.id);
+  assert.equal(emailLogin.body.user.username, fields.username);
+  assert.equal((await request('/pay/balance', undefined, emailLogin.cookie)).body.balance, 17);
+  assert.equal((await request('/pay/balance', undefined, nameLogin.cookie)).body.balance, 17);
+  const wrong = await request('/login', { username: fields.email, password: 'wrong-password' });
+  const missing = await request('/login', { username: 'missing@example.test', password: fields.password });
+  assert.equal(wrong.status, 401); assert.equal(missing.status, 401);
+  assert.equal(wrong.body.error, missing.body.error);
+});
+
+test('legacy Chinese usernames remain usable and pending email claims cannot shadow the verified owner', async t => {
+  const account = (id, username, password, emailVerified) => {
+    const salt = crypto.randomBytes(16).toString('hex');
+    return { id, username, email: 'shared@example.test', emailVerified, salt, digest: crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex') };
+  };
+  const pending = account('pending', 'pending_player', 'pending-password', false);
+  const owner = account('owner', '步云', 'owner-password', true);
+  const { request } = await fixture(t, { accounts: [pending, owner] });
+  const legacy = await request('/login', { username: owner.username, password: 'owner-password' });
+  const email = await request('/login', { username: 'SHARED@example.test', password: 'owner-password' });
+  assert.equal(legacy.status, 200); assert.equal(email.status, 200);
+  assert.equal(legacy.body.user.id, owner.id); assert.equal(email.body.user.id, owner.id);
+  assert.equal((await request('/login', { username: 'shared@example.test', password: 'pending-password' })).status, 401);
 });
 
 test('existing passwords longer than the new registration limit can still log in', async t => {

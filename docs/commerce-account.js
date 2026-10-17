@@ -41,6 +41,11 @@
   byId('commerce-toggle').addEventListener('click', () => {
     registering = !registering;
     byId('commerce-title').textContent = registering ? '注册购卡账号' : '登录购卡账号';
+    byId('commerce-identifier-label').textContent = registering ? '用户名' : '用户名或邮箱';
+    byId('commerce-identifier-help').textContent = registering ? '3～24 位英文字母、数字或下划线' : '可使用用户名或已验证邮箱登录';
+    byId('commerce-username').pattern = registering ? '[A-Za-z0-9_]{3,24}' : '.*';
+    byId('commerce-username').minLength = registering ? 3 : 1;
+    byId('commerce-username').maxLength = registering ? 24 : 254;
     byId('commerce-email-field').hidden = !registering;
     byId('commerce-email').disabled = !registering; byId('commerce-email').required = registering;
     byId('commerce-password').autocomplete = registering ? 'new-password' : 'current-password';
