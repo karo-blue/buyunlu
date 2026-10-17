@@ -1374,8 +1374,11 @@ button:active { filter: brightness(.96); }
 .event-scene { margin-top: 10px; }
 .event-options { margin-top: 10px; gap: 8px; }
 .event-option { padding: 10px 12px !important; font-size: 14px; }
-.wallet-float { width: min(248px, calc(var(--app-width) - 28px)); min-height: 60px; padding: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); }
-.wallet-float-buy { min-width: 84px; }
+.wallet-float { width: min(208px, calc(var(--app-width) - 28px)); min-height: 52px; padding: 4px 6px; bottom: calc(10px + env(safe-area-inset-bottom)); }
+.wallet-float-buy { min-width: 72px; height: 44px !important; min-height: 44px; border-radius: 12px !important; font-size: 12px; }
+.wallet-float-icon, .wallet-float-icon-fallback { flex: 0 0 26px; width: 26px; height: 26px; margin-right: 6px; line-height: 26px; }
+.wallet-float-title { font-size: 12px; }
+.wallet-float-status { font-size: 11px; margin-top: 2px; }
 .dialog-kicker { padding: 14px 16px 4px; }
 .dialog-title { font-size: 18px; padding: 0 16px 10px; }
 .dialog-content { padding: 0 16px 14px; }
@@ -1394,3 +1397,10 @@ button:active { filter: brightness(.96); }
 .nameselect-sub { font-size: 13px; line-height: 1.5; margin-top: 8px; }
 .nameselect-surname-row, .nameselect-choice-head { margin-top: 12px; }
 .nameselect-confirm { min-height: 44px; margin-top: 14px; font-size: 15px; }
+
+/* One quiet surface treatment across game cards, dialogs and the wallet. */
+html, body { background: #f4f6fa; color: #24334b; }
+.ambient { opacity: .35; }
+.mission-card, .overview-card, .action-card, .event-card, .metric { border-color: #dce3ed; box-shadow: 0 4px 16px #25395606; }
+.dialog-card, .burst-card, .nameselect-card { border-radius: 16px; box-shadow: 0 12px 40px #25395620; }
+.wallet-float { border-color: #ced9ee; border-radius: 16px; background: #f7faff; box-shadow: 0 4px 18px #25395618; }

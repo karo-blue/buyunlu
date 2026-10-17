@@ -6,7 +6,8 @@
   const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
   const modeAvailable = () => !mobile || status?.modes?.includes('wap');
   const requestKey = 'buyunlu_alipay_request';
-  const amountInput = byId('purchase-yuan');
+  const amountInput = byId('purchase-yuan'), agreement = byId('purchase-agree');
+  const presets = [...document.querySelectorAll('[data-yuan]')];
   const quantity = () => /^[1-9]\d{0,2}$/.test(amountInput.value) && Number(amountInput.value) <= 100 ? Number(amountInput.value) : null;
   async function api(route, body) {
     if (window.BuyunluAPI) return window.BuyunluAPI.request(route, body);
@@ -21,13 +22,16 @@
     const units = order ? order.quantity : quantity();
     const active = order ? order.state === 'pending' && !!order.payUrl : available && units !== null;
     amountInput.disabled = busy || !!order || !!status?.testOnly;
+    for (const preset of presets) { preset.disabled = amountInput.disabled; preset.setAttribute('aria-pressed', String(Number(preset.dataset.yuan) === units)); }
+    byId('purchase-terms').hidden = !!order;
+    agreement.disabled = busy || !!order;
     byId('amount-error').textContent = !order && units === null ? '请输入 1～100 的整数元金额，每元到账 10 张。' : '';
     amountInput.setAttribute('aria-invalid', String(!order && units === null));
     byId('purchase-cards').textContent = order ? order.cards + ' 张' : units === null ? '—' : units * 10 + ' 张';
     if (!order) byId('order-amount').textContent = byId('order-total').textContent = units === null ? '—' : '¥' + units.toFixed(2);
     payButton.hidden = paid || !user?.emailVerified;
-    payButton.disabled = busy || !available || !active;
-    payButton.textContent = busy ? '正在处理…' : status?.enabled && !modeAvailable() ? '请在电脑端购买' : !available ? status?.testOnly ? '测试购买未开放' : '支付暂不可用' : order ? active ? '继续支付宝付款' : '订单已结束' : units === null ? '请输入整数金额' : '支付宝支付 ¥' + units.toFixed(2);
+    payButton.disabled = busy || !available || !active || (!order && !agreement.checked);
+    payButton.textContent = busy ? '正在处理…' : status?.enabled && !modeAvailable() ? '请在电脑端购买' : !available ? status?.testOnly ? '测试购买未开放' : '支付暂不可用' : order ? active ? '继续支付宝付款' : '订单已结束' : units === null ? '请输入整数金额' : !agreement.checked ? '请先确认购买须知' : '支付宝支付 ¥' + units.toFixed(2);
     payButton.setAttribute('aria-busy', String(busy));
     checkButton.hidden = !order || paid; checkButton.disabled = busy;
     checkButton.textContent = busy ? '正在查询…' : '我已支付，查询结果';
@@ -59,7 +63,7 @@
   }
   payButton.addEventListener('click', async () => {
     if (busy || !status?.enabled || !user?.emailVerified || !modeAvailable()) return;
-    if (!order && quantity() === null) { render(); return; }
+    if (!order && (!agreement.checked || quantity() === null)) { render(); return; }
     busy = true; byId('payment-error').textContent = ''; render();
     try {
       if (!order) {
@@ -78,12 +82,14 @@
     } catch (cause) { byId('payment-error').textContent = cause.message || '下单失败，请重试'; }
     finally { busy = false; render(); }
   });
-  amountInput.addEventListener('input', render);
+  amountInput.addEventListener('input', () => { agreement.checked = false; render(); });
+  agreement.addEventListener('change', render);
+  for (const preset of presets) preset.addEventListener('click', () => { if (!preset.disabled) { amountInput.value = preset.dataset.yuan; agreement.checked = false; render(); } });
   checkButton.addEventListener('click', check);
   byId('new-order').addEventListener('click', () => {
     if (busy) return;
-    order = null; sessionStorage.removeItem(requestKey); history.replaceState(null, '', 'checkout.html');
-    byId('checkout-title').textContent = '确认购买'; byId('order-amount').textContent = byId('order-total').textContent = '¥1.00';
+    order = null; agreement.checked = false; sessionStorage.removeItem(requestKey); history.replaceState(null, '', 'checkout.html');
+    byId('checkout-title').textContent = '购买广告卡'; byId('order-amount').textContent = byId('order-total').textContent = '¥1.00';
     notice.textContent = '尚未创建新订单，确认后前往支付宝收银台。'; byId('payment-error').textContent = ''; render();
   });
   (async () => {
@@ -91,7 +97,7 @@
       status = await api('/pay/status');
       if (status.testOnly) { amountInput.value = '1'; byId('amount-help').textContent = '本次仅开放 1 元购买 10 张的支付验证。'; }
       byId('alipay-state').textContent = status.enabled ? status.sandbox ? '沙箱测试' : '已开通' : status.testOnly ? '限指定账号测试' : '暂不可用';
-      notice.textContent = status.enabled ? status.sandbox ? '当前为支付宝沙箱环境，不进行真实收款。' : '点击付款后前往支付宝收银台，支付结果以服务器确认为准。' : status.reason;
+      notice.textContent = status.enabled ? status.sandbox ? '当前为支付宝沙箱环境，不进行真实收款。' : '确认后前往支付宝，支付成功并经系统确认后到账。' : status.reason;
       try { user = (await api('/account')).user; } catch (cause) { if (cause.status !== 401) throw cause; }
       if (!user?.emailVerified) {
         const orderId = new URLSearchParams(location.search).get('order');

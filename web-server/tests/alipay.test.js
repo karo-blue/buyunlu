@@ -154,3 +154,14 @@ test('sandbox money cannot become a real-money wallet by changing configuration'
   const order = payments.createOrder(user, { requestId: requestId(), quantity: 1, mode: 'page' }); payments.notify(notice(order));
   assert.throws(() => create({ config: { ...config, sandbox: false } }), /独立数据目录/);
 });
+
+ test('loading a save costs one card and retries remain bound to the same purpose across restart', t => {
+  const { payments, create } = fixture(t);
+  const order = payments.createOrder(user, { requestId: requestId(), quantity: 1, mode: 'wap' });
+  payments.notify(notice(order));
+  const input = { requestId: requestId(), scene: 'load' };
+  assert.equal(payments.consume(user, input).balance, 9);
+  assert.equal(create().consume(user, input).balance, 9);
+  assert.throws(() => create().consume(user, { ...input, scene: 'promotion' }), /用途/);
+  assert.equal(create().balance(user), 9);
+ });

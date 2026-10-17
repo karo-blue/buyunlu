@@ -3,7 +3,7 @@
   else root.BuyunluCommerce=factory();
 })(typeof window==='object'?window:globalThis,function(){
   'use strict';
-  function install(page,{host,boards}) {
+  function install(page,{host,boards,storage}) {
     const account=host.BuyunluCardAccount, api=host.BuyunluAPI.request;
     if(boards){
       let boardRequest=0;
@@ -51,29 +51,30 @@
     };
     page.buyAdCard=page.chooseAdCardAmount=page.showCustomAdCardAmount=function(){account.checkout();};
     page.showAdCard=function(){
-      if(record.request)return this.showModal({title:'确认上次用卡',content:'上次用卡结果未确认，请在晋升条件中重试。重复请求不会重复扣卡。',showCancel:false});
+      if(record.request)return this.showModal({title:'确认上次用卡',content:record.request.scene==='load'?'上次读档尚未完成。重试将读取之前选择的存档，不会重复扣卡。':'上次用卡结果未确认，请在晋升条件中重试。重复请求不会重复扣卡。',showCancel:record.request.scene==='load',confirmText:record.request.scene==='load'?'重试确认':'确定',success:answer=>{if(answer.confirm&&record.request?.scene==='load')this.useLoadAdCard(record.request.slot);}});
       return account.checkout();
     };
     page.consumeAdCard=async function(options={}){
       if(this._payBusy||typeof options.reward!=='function')return;
-      if(options.scene!=='promotion')return host.wx.showToast({title:'网页版广告卡用于晋升加成，其他激励广告暂不支持'});
+      if(!['promotion','load'].includes(options.scene))return host.wx.showToast({title:'广告卡仅用于晋升加成或读取存档'});
       if(!account.user?.emailVerified)return account.open();
       const owner=account.user.id;
       const state=this.data.state;
-      if(state.ended||state.rankIndex>=11)return host.wx.showToast({title:'当前无需晋升加成，未扣卡'});
-      if(!record.request)record.request={requestId:host.crypto.randomUUID(),year:state.year,rankIndex:state.rankIndex,
-        before:state.promotionAdUsedYear===state.year?state.promotionAdWatchCount:0};
+      if(options.scene==='promotion'&&(state.ended||state.rankIndex>=11))return host.wx.showToast({title:'当前无需晋升加成，未扣卡'});
+      if(record.request&&(record.request.scene||'promotion')!==options.scene)return this.showAdCard();
+      if(!record.request)record.request=options.scene==='load'?{requestId:host.crypto.randomUUID(),scene:'load',slot:options.slot,snapshot:options.snapshot}:
+        {requestId:host.crypto.randomUUID(),scene:'promotion',year:state.year,rankIndex:state.rankIndex,before:state.promotionAdUsedYear===state.year?state.promotionAdWatchCount:0};
       const request=record.request;
-      if(request.year!==state.year||request.rankIndex!==state.rankIndex)return host.wx.showToast({title:'请先恢复上次用卡时的游戏进度'});
+      if(options.scene==='promotion'&&(request.year!==state.year||request.rankIndex!==state.rankIndex))return host.wx.showToast({title:'请先恢复上次用卡时的游戏进度'});
       try{save();}catch{return host.wx.showToast({title:'本机存储不可用，未提交扣卡'});}
       this._payBusy=true;
       try{
-        const result=await api('/pay/consume',{scene:'promotion',requestId:request.requestId});
+        const result=await api('/pay/consume',{scene:options.scene,requestId:request.requestId});
         if(account.user?.id!==owner)return;
         this.setPay({balance:result.balance});
         const current=this.data.state;
-        const alreadyApplied=current.promotionAdUsedYear===request.year&&current.promotionAdWatchCount>request.before;
-        if(!record.applied.includes(request.requestId)&&!alreadyApplied){options.reward();}
+        const alreadyApplied=options.scene==='load'?current._paidLoadRequest===request.requestId:current.promotionAdUsedYear===request.year&&current.promotionAdWatchCount>request.before;
+        if(!record.applied.includes(request.requestId)&&!alreadyApplied){options.reward(request);}
         record.applied=[...record.applied.slice(-99),request.requestId];record.request=null;save();
       }catch(cause){
         if(account.user?.id!==owner)return;
@@ -83,6 +84,7 @@
     };
     page.playRewardedVideo=function(options={}){
       if(options.scene==='promotion')return this.consumeAdCard(options);
+      if(options.scene==='load')return this.load();
       host.wx.showToast({title:'网页版不播放微信激励广告，未发放奖励'});
     };
     const showActions=page.showActionSheet;
@@ -92,10 +94,39 @@
       return showActions.call(this,next,extra);
     };
     const patch=page.buildPatch;
-    page.buildPatch=function(...args){const result=patch.apply(this,args);result.adText='广告卡每张0.1元，最低1元购买10张；每张晋升概率增加3个百分点，不保证成功。付费卡余额按购卡账号保存。';return result;};
-    for(const method of ['startFreshGame','applyLoadedSlot','startQuarter']){
+    page.buildPatch=function(...args){const result=patch.apply(this,args);result.adText='每张广告卡可增加晋升概率3个百分点，或读取一次本机存档；不保证晋升成功。每张0.1元，最低1元买10张，余额按购卡账号保存。';return result;};
+    for(const method of ['startFreshGame','startQuarter']){
       const original=page[method];
       page[method]=function(...args){if(record.request||this._payBusy)return this.showAdCard();return original.apply(this,args);};
+    }
+    if(storage){
+      page.useLoadAdCard=function(slot){
+        if(this._payBusy)return;
+        if(record.request&&(record.request.scene!=='load'||record.request.slot!==slot))return this.showAdCard();
+        const snapshot=record.request?.snapshot||storage.loadSlot(slot);
+        if(!snapshot||typeof snapshot!=='object'||!Number.isFinite(snapshot.age)||!Number.isFinite(snapshot.year))return host.wx.showToast({title:'存档为空或损坏，未扣卡'});
+        return this.consumeAdCard({scene:'load',slot,snapshot,reward:request=>{
+          // The receipt is stored with the game state in one write. A retry after a
+          // crash cannot reset progress again or turn a saved slot into free cards.
+          const persisted=storage.load();
+          const loaded=persisted?._paidLoadRequest===request.requestId?persisted:{...request.snapshot,_paidLoadRequest:request.requestId};
+          if(!storage.save(loaded))throw new Error('读档尚未完成，请释放本机存储后重试，不会重复扣卡');
+          host.wx.removeStorageSync('buyunlu_mobile_pending_v1');
+          this._burstEvent=null;this._burstKind='normal';this._burstReview=false;
+          this.setData({state:loaded,currentEvent:null,burst:{visible:false,review:false,flag:'',tag:'',title:'',scene:'',tip:'',options:[]}},()=>this.refresh());
+          host.wx.showToast({title:'已读取存档'+request.slot+'，消耗1张广告卡'});
+        }});
+      };
+      page.applyLoadedSlot=function(slot){return this.useLoadAdCard(slot);};
+      page.load=function(){
+        if(record.request||this._payBusy)return this.showAdCard();
+        const slots=storage.slotList();
+        this.showActionSheet({title:'读取本机存档',content:'成功读档消耗 1 张广告卡，替换当前游戏进度。取消或空存档不扣卡。',
+          itemList:slots.map(slot=>slot.empty?'存档'+slot.slot+' · 空':'存档'+slot.slot+' · '+slot.name+' · '+slot.year+'年'),cancelText:'返回',success:result=>{
+            const slot=slots[result.tapIndex];if(!slot||slot.empty)return host.wx.showToast({title:'该存档为空，未扣卡'});
+            this.showModal({title:'读取存档'+slot.slot,content:'读取'+slot.name+'在'+slot.year+'年的进度，将替换当前进度。需消耗 1 张广告卡，余额以服务器确认为准。',confirmText:'用1张卡读档',cancelText:'取消',success:answer=>{if(answer.confirm)this.useLoadAdCard(slot.slot);}});
+          }});
+      };
     }
     const selectNav=page.selectNav;
     page.selectNav=function(...args){selectNav.apply(this,args);if(this.data.dialog?.visible)this.setData({'dialog.content':this.data.dialog.content.replace(/离线版可免费领取晋升加成。/g,'广告卡购买和使用需联网确认。')});};

@@ -155,9 +155,12 @@ function createPayments(options) {
     },
     consume(user, body) {
       if (!validRequest(body.requestId)) throw fail(400, '用卡请求标识无效');
-      if (body.scene !== 'promotion') throw fail(400, '概率卡仅支持晋升用途');
+      if (!['promotion', 'load'].includes(body.scene)) throw fail(400, '广告卡仅支持晋升或读档用途');
       const key = user.id + ':' + body.requestId;
-      if (ledger.consumed[key]) return { ok: true, balance: ledger.wallets[user.id] || 0, requestId: body.requestId };
+      if (ledger.consumed[key]) {
+        if (ledger.consumed[key].scene !== body.scene) throw fail(409, '用卡请求用途不一致');
+        return { ok: true, balance: ledger.wallets[user.id] || 0, requestId: body.requestId };
+      }
       if (!(ledger.wallets[user.id] > 0)) throw fail(409, '概率卡余额不足');
       return mutate(next => { next.wallets[user.id]--; next.consumed[key] = { scene: body.scene, at: now() }; return { ok: true, balance: next.wallets[user.id], requestId: body.requestId }; });
     }

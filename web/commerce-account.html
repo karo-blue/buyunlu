@@ -1,13 +1,13 @@
 <section id="commerce-account" class="commerce-mask" role="dialog" aria-modal="true" aria-labelledby="commerce-title" hidden>
   <div class="commerce-card">
     <button id="commerce-close" class="commerce-close" type="button" aria-label="关闭购卡账号窗口">关闭</button>
-    <h2 id="commerce-title">登录购卡账号</h2><p>账号用于保存付费广告卡余额。游戏角色和本机存档保持不变。</p>
+    <h2 id="commerce-title">登录购卡账号</h2><p>登录后购买和使用广告卡，余额随账号保存。</p>
     <p id="commerce-current" hidden></p><button id="commerce-logout" type="button" hidden>退出当前购卡账号</button>
     <form id="commerce-login-form">
       <label id="commerce-identifier-label" for="commerce-username">用户名或邮箱</label><input id="commerce-username" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="1" maxlength="254" aria-describedby="commerce-identifier-help" required>
       <small id="commerce-identifier-help">可使用用户名或已验证邮箱登录</small>
       <div id="commerce-email-field" hidden><label for="commerce-email">验证邮箱</label><input id="commerce-email" type="email" autocomplete="email" maxlength="254" disabled></div>
-      <label for="commerce-password">密码</label><input id="commerce-password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required><small>注册密码 8～20 位；已有长密码仍可登录。请妥善保存，当前不支持自助找回。</small>
+      <label for="commerce-password">密码</label><input id="commerce-password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required><small>密码请设为 8～20 位，并妥善保存。</small>
       <button id="commerce-submit" class="commerce-primary" type="submit">登录</button><button id="commerce-toggle" type="button">没有账号？注册</button>
     </form>
     <form id="commerce-verify-form" hidden>

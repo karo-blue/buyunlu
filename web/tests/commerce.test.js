@@ -35,8 +35,8 @@ test('a temporary connection failure preserves the remembered session',async()=>
  await assert.rejects(api.request('/account'));assert.equal(api.hasSession(),true);
 });
 
-function fixture({store=new Map(),state,failAfterDebit=false,user=true,boards,boardRequest}={}){
-  let balance=10,rewards=0,debits=0,opened=0;const spent=new Set(),requests=[];
+function fixture({store=new Map(),state,failAfterDebit=false,user=true,boards,boardRequest,slots={1:{name:"旧存档",year:2024,age:30,rankIndex:1}},saveFails=false}={}){
+  let balance=10,rewards=0,debits=0,opened=0;let saved;const spent=new Set(),requests=[];
   const host={crypto,localStorage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)},wx:{showToast(){}},
     BuyunluCardAccount:{user:user?{id:'one',username:'tester',emailVerified:true}:null,ready:Promise.resolve(),open:()=>opened++,checkout:()=>opened++},
     BuyunluAPI:{request:async(route,body)=>{
@@ -47,9 +47,14 @@ function fixture({store=new Map(),state,failAfterDebit=false,user=true,boards,bo
       return {balance};
     }}};
   const page={data:{state:state||{year:2026,rankIndex:1,promotionAdUsedYear:2026,promotionAdWatchCount:0},dialog:{}},_payRaw:{balance:0},
-    setPay(value){this._payRaw={...this._payRaw,...value};},setData(){},showModal(options){this.data.dialog={...options,visible:true};},showActionSheet(){},buildPatch:()=>({}),selectNav(){},startFreshGame(){},applyLoadedSlot(){},startQuarter(){}};
-  install(page,{host,boards});
-  return {page,host,store,requests,use:()=>page.consumeAdCard({scene:'promotion',reward:()=>{rewards++;page.data.state.promotionAdWatchCount++;}}),counts:()=>({balance,rewards,debits,opened})};
+    setPay(value){this._payRaw={...this._payRaw,...value};},setData(){},showModal(options){this.data.dialog={...options,visible:true};},showActionSheet(options){this.sheet=options;},buildPatch:()=>({}),selectNav(){},startFreshGame(){},applyLoadedSlot(){},startQuarter(){}};
+  const storage={KEY:'save',load:()=>saved,loadSlot:slot=>slots[slot]||null,
+    slotList:()=>[1,2,3].map(slot=>({slot,empty:!slots[slot],...slots[slot]})),
+    save:state=>{if(saveFails)return false;saved=JSON.parse(JSON.stringify(state));return true;}};
+  host.wx.removeStorageSync=()=>{};page.refresh=()=>{};
+  page.setData=function(value,callback){Object.assign(this.data,value);callback?.();};
+  install(page,{host,boards,storage});
+  return {page,host,store,requests,storage,use:()=>page.consumeAdCard({scene:'promotion',reward:()=>{rewards++;page.data.state.promotionAdWatchCount++;}}),counts:()=>({balance,rewards,debits,opened})};
 }
 test('old offline free-card balances cannot become paid cards and guests cannot consume',async()=>{
   const f=fixture({user:false,store:new Map([['buyunlu_mobile_cards_v1','99999']])});
@@ -100,4 +105,57 @@ test('late or failed leaderboard reads never replace another board or pretend lo
  const third=f.page.showEscapeBoard();pending['/public/escapeboard?limit=8'].reject(new Error('offline'));await third;
  assert.ok(f.page.data.dialog.rows.some(row=>/连接失败/.test(row.text)));
  assert.equal(f.page.data.dialog.rows.some(row=>row.kind==='entry'),false);
+});
+
+test('save loading requires confirmation; cancelling, empty and unreadable slots spend nothing',async()=>{
+ const f=fixture();await new Promise(resolve=>setImmediate(resolve));
+ f.page.load();assert.match(f.page.sheet.content,/1 张/);
+ f.page.sheet.success({tapIndex:1});assert.equal(f.counts().debits,0);
+ f.page.sheet.success({tapIndex:0});f.page.data.dialog.success({confirm:false});
+ assert.equal(f.counts().debits,0);await f.page.useLoadAdCard(2);assert.equal(f.counts().debits,0);
+});
+test('lost load response retries the saved snapshot once even if the slot changes',async()=>{
+ const slots={1:{name:'原存档',year:2024,age:30,rankIndex:1}};
+ const f=fixture({slots,failAfterDebit:true});await new Promise(resolve=>setImmediate(resolve));
+ const before=f.page.data.state;await f.page.useLoadAdCard(1);
+ assert.equal(f.page.data.state,before);assert.equal(f.counts().debits,1);
+ slots[1]={name:'新存档',year:2030};
+ await f.page.useLoadAdCard(1);
+ assert.equal(f.counts().debits,1);assert.equal(f.requests[0],f.requests[1]);
+ assert.equal(f.page.data.state.name,'原存档');assert.equal(f.storage.load().name,'原存档');
+ assert.equal(f.page.cardBalance(),9);assert.equal(f.host.BuyunluCardAccount.canChange(),true);
+ assert.equal(JSON.parse(f.store.get('buyunlu_paid_card_use:one')).request,null);
+});
+test('a confirmed load whose local save fails remains retryable without another debit',async()=>{
+ const f=fixture({saveFails:true});await new Promise(resolve=>setImmediate(resolve));
+ await f.page.useLoadAdCard(1);await f.page.useLoadAdCard(1);
+ assert.equal(f.counts().debits,1);assert.equal(f.host.BuyunluCardAccount.canChange(),false);
+ assert.equal(f.page.data.state.name,undefined);
+});
+test('guests cannot load a paid save or bypass payment through applyLoadedSlot',async()=>{
+ const f=fixture({user:false});await new Promise(resolve=>setImmediate(resolve));
+ await f.page.applyLoadedSlot(1);assert.equal(f.counts().debits,0);assert.equal(f.counts().opened,1);
+});
+
+test('distinct completed loads each cost one card and cannot restore the wallet',async()=>{
+ const f=fixture();await new Promise(resolve=>setImmediate(resolve));
+ await f.page.useLoadAdCard(1);await f.page.useLoadAdCard(1);
+ assert.equal(f.counts().debits,2);assert.equal(f.page.cardBalance(),8);assert.notEqual(f.requests[0],f.requests[1]);
+});
+test('storage failure before debit cannot spend a card',async()=>{
+ const f=fixture();await new Promise(resolve=>setImmediate(resolve));
+ f.host.localStorage.setItem=()=>{throw new Error('disk full');};
+ await f.page.useLoadAdCard(1);assert.equal(f.counts().debits,0);
+});
+test('a completion receipt prevents reapplying progress when journal completion fails and is retried',async()=>{
+ const f=fixture();await new Promise(resolve=>setImmediate(resolve));
+ const write=f.host.localStorage.setItem;let count=0;
+ f.host.localStorage.setItem=(key,value)=>{if(++count===2)throw new Error('journal unavailable');write(key,value);};
+ await f.page.useLoadAdCard(1);assert.equal(f.counts().debits,1);
+ const receipt=f.page.data.state._paidLoadRequest;
+ f.page.data.state.year=2025;f.storage.save(f.page.data.state);
+ // Restore the durable pending request just as a fresh page would.
+ install(f.page,{host:f.host,storage:f.storage});await new Promise(resolve=>setImmediate(resolve));
+ await f.page.useLoadAdCard(1);
+ assert.equal(f.counts().debits,1);assert.equal(f.page.data.state.year,2025);assert.equal(f.page.data.state._paidLoadRequest,receipt);
 });
