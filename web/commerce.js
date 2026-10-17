@@ -3,8 +3,28 @@
   else root.BuyunluCommerce=factory();
 })(typeof window==='object'?window:globalThis,function(){
   'use strict';
-  function install(page,{host}) {
+  function install(page,{host,boards}) {
     const account=host.BuyunluCardAccount, api=host.BuyunluAPI.request;
+    if(boards){
+      let boardRequest=0;
+      for(const [method,path,title,format] of [
+        ['showLeaderboard','leaderboard','步云录 · 人生排行榜',boards.rankingRows],
+        ['showTigerBoard','tigerboard','步云录 · 老虎榜',boards.tigerRows],
+        ['showEscapeBoard','escapeboard','金蝉榜 · 虚构结局记录',boards.escapeRows],
+      ])page[method]=async function(){
+        const sequence=++boardRequest,ending=method==='showLeaderboard'&&!!this.data.state.ended;
+        const show=rows=>this.showModal({title,rows,content:'',showCancel:ending,confirmText:ending?'再试一次':'确定',cancelText:'关闭',
+          success:result=>{if(ending&&result.confirm)this.startFreshGame();}});
+        show([{kind:'note',text:'正在读取原排行榜…'}]);
+        try{
+          const result=await api('/public/'+path+'?limit=8');
+          if(sequence!==boardRequest||!this.data.dialog.visible||this.data.dialog.title!==title)return;
+          show(format(result).map(row=>row.text==='本设备尚未提交结局成绩'?{...row,text:'与原小程序共用排行榜数据'}:row));
+        }catch{
+          if(sequence===boardRequest&&this.data.dialog.visible&&this.data.dialog.title===title)show([{kind:'note',text:'排行榜暂时连接失败，请稍后重试。'}]);
+        }
+      };
+    }
     let record={request:null,applied:[]};
     const setPay=page.setPay;
     page.setPay=function(value){setPay.call(this,value);this.setData({'pay.priceText':'¥0.10/张','pay.buyLabel':account.user?.emailVerified?'购买':'登录购买'});};

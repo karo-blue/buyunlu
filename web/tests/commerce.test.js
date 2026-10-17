@@ -15,19 +15,20 @@ test('payment API uses the configured server without cookies, stores only opaque
   assert.equal(JSON.stringify([...storage.values()]).includes('test-only-password'),false);
   token=null;status=401;await assert.rejects(api.request('/account'));assert.equal(api.hasSession(),false);
 });
-function fixture({store=new Map(),state,failAfterDebit=false,user=true}={}){
+function fixture({store=new Map(),state,failAfterDebit=false,user=true,boards,boardRequest}={}){
   let balance=10,rewards=0,debits=0,opened=0;const spent=new Set(),requests=[];
   const host={crypto,localStorage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)},wx:{showToast(){}},
     BuyunluCardAccount:{user:user?{id:'one',username:'tester',emailVerified:true}:null,ready:Promise.resolve(),open:()=>opened++,checkout:()=>opened++},
     BuyunluAPI:{request:async(route,body)=>{
+      if(route.startsWith('/public/'))return boardRequest(route);
       if(route==='/pay/balance')return {balance};
       requests.push(body.requestId);
       if(!spent.has(body.requestId)){spent.add(body.requestId);balance--;debits++;if(failAfterDebit){failAfterDebit=false;throw new Error('response lost');}}
       return {balance};
     }}};
   const page={data:{state:state||{year:2026,rankIndex:1,promotionAdUsedYear:2026,promotionAdWatchCount:0},dialog:{}},_payRaw:{balance:0},
-    setPay(value){this._payRaw={...this._payRaw,...value};},setData(){},showModal(){},showActionSheet(){},buildPatch:()=>({}),selectNav(){},startFreshGame(){},applyLoadedSlot(){},startQuarter(){}};
-  install(page,{host});
+    setPay(value){this._payRaw={...this._payRaw,...value};},setData(){},showModal(options){this.data.dialog={...options,visible:true};},showActionSheet(){},buildPatch:()=>({}),selectNav(){},startFreshGame(){},applyLoadedSlot(){},startQuarter(){}};
+  install(page,{host,boards});
   return {page,host,store,requests,use:()=>page.consumeAdCard({scene:'promotion',reward:()=>{rewards++;page.data.state.promotionAdWatchCount++;}}),counts:()=>({balance,rewards,debits,opened})};
 }
 test('old offline free-card balances cannot become paid cards and guests cannot consume',async()=>{
@@ -52,4 +53,31 @@ test('a debit response cannot grant a reward or replace the balance after accoun
  const pending=f.use();assert.equal(f.host.BuyunluCardAccount.canChange(),false);
  f.host.BuyunluCardAccount.user={id:'other',username:'other',emailVerified:true};
  await pending;assert.equal(f.counts().rewards,0);
+});
+
+const boardFormatters=require('../../services/leaderboard-api');
+test('guests view all three original boards with upstream ranks and totals and without submitting scores',async()=>{
+ const routes=[];
+ const f=fixture({user:false,boards:boardFormatters,boardRequest:async route=>{routes.push(route);return {ok:true,total:89433,rank:null,entries:[{rank:1,name:'历史玩家',rankIndex:11}]};}});
+ for(const method of ['showLeaderboard','showTigerBoard','showEscapeBoard']){
+  await f.page[method]();
+  assert.equal(f.page.data.dialog.rows.find(row=>row.kind==='entry').name,'历史玩家');
+  assert.equal(f.page.data.dialog.rows.find(row=>row.kind==='entry').rank,1);
+  assert.ok(f.page.data.dialog.rows.some(row=>row.text?.includes('89433')));
+ }
+ assert.deepEqual(routes,['/public/leaderboard?limit=8','/public/tigerboard?limit=8','/public/escapeboard?limit=8']);
+ assert.equal(f.counts().opened,0);assert.equal(f.counts().debits,0);
+});
+
+test('late or failed leaderboard reads never replace another board or pretend local scores are shared data',async()=>{
+ const pending={};
+ const f=fixture({user:false,boards:boardFormatters,boardRequest:route=>new Promise((resolve,reject)=>{pending[route]={resolve,reject};})});
+ const first=f.page.showLeaderboard(),second=f.page.showTigerBoard();
+ pending['/public/tigerboard?limit=8'].resolve({ok:true,total:12,entries:[{rank:1,name:'旧虎榜',rankIndex:8}]});await second;
+ pending['/public/leaderboard?limit=8'].resolve({ok:true,total:2,entries:[{rank:1,name:'延迟旧响应'}]});await first;
+ assert.equal(f.page.data.dialog.title,'步云录 · 老虎榜');
+ assert.equal(f.page.data.dialog.rows.find(row=>row.kind==='entry').name,'旧虎榜');
+ const third=f.page.showEscapeBoard();pending['/public/escapeboard?limit=8'].reject(new Error('offline'));await third;
+ assert.ok(f.page.data.dialog.rows.some(row=>/连接失败/.test(row.text)));
+ assert.equal(f.page.data.dialog.rows.some(row=>row.kind==='entry'),false);
 });

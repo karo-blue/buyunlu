@@ -8,6 +8,7 @@ test('GitHub frontend sessions work without third-party cookies and reject other
   const frontend = 'https://frontend.example', backend = 'https://backend.example';
   let code;
   const server = createServer({ dataDir, origin: backend, frontendUrl: frontend + '/buyunlu/',
+    fetch: async () => ({ ok: true, json: async () => ({ ok: true, total: 3, entries: [{ rank: 1, name: '历史玩家' }] }) }),
     sendVerificationEmail: async value => { code = value.code; } });
   await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));fs.rmSync(dataDir,{recursive:true,force:true});});
@@ -21,6 +22,11 @@ test('GitHub frontend sessions work without third-party cookies and reject other
   assert.equal(options.headers.get('access-control-allow-credentials'),null);
   const badOptions = await fetch(base+'/login',{method:'OPTIONS',headers:{Origin:'https://evil.example'}});
   assert.equal(badOptions.headers.get('access-control-allow-origin'),null);
+  const board = await call('/public/leaderboard');
+  assert.equal(board.status,200);
+  assert.equal(board.headers.get('access-control-allow-origin'),frontend);
+  assert.equal(board.headers.get('set-cookie'),null);
+  assert.equal((await board.json()).entries[0].name,'历史玩家');
   const registered = await call('/register',{username:'web_tester',password:'long password 123',email:'tester@example.test'});
   assert.equal(registered.status,201);
   const token = registered.headers.get('x-buyunlu-session');

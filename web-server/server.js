@@ -185,6 +185,20 @@ function createServer(options = {}) {
       const user = currentUser(request);
       // Nginx must replace X-Real-IP; the service binds only to loopback.
       const ip = String(request.headers['x-real-ip'] || request.socket.remoteAddress);
+      const publicBoard = route.match(/^\/public\/(leaderboard|tigerboard|escapeboard)$/);
+      if (publicBoard && request.method === 'GET') {
+        rateLimit('board-read:' + ip, 120, 60000);
+        const remote = new URL(upstream + '/' + publicBoard[1]);
+        remote.searchParams.set('limit', String(Math.max(1, Math.min(100, Math.floor(Number(url.searchParams.get('limit')) || 8)))));
+        let result;
+        try {
+          const upstreamResponse = await fetchRemote(remote.toString(), { method: 'GET', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+          if (!upstreamResponse.ok) throw 0;
+          result = await upstreamResponse.json();
+          if (result?.ok !== true || !Array.isArray(result.entries)) throw 0;
+        } catch { throw error(502, '排行榜暂时连接失败，请稍后重试'); }
+        return json(response, 200, result);
+      }
       if (['/register', '/login'].includes(route) && request.method === 'POST') {
         rateLimit('auth:' + ip, 30);
         const body = await bodyOf(request);

@@ -35,14 +35,14 @@ function convertCss(source) {
   return source.replace(/(-?(?:\d+\.?\d*|\.\d+))rpx\b/g, (_, value) => `calc(${value} * var(--rpx))`);
 }
 
-function mobileTemplate(nodes) {
+function mobileTemplate(nodes, sharedBoards = false) {
   return nodes.map(node => {
-    if (node.text != null) return { text: node.text.replaceAll('全网排行榜', '本机排行榜').replaceAll('全网榜单', '本机榜单') };
+    if (node.text != null) return { text: sharedBoards ? node.text : node.text.replaceAll('全网排行榜', '本机排行榜').replaceAll('全网榜单', '本机榜单') };
     const attrs = { ...node.attrs };
     if (attrs['open-type']) delete attrs['open-type'];
-    if (attrs['aria-label'] === '全网榜单') attrs['aria-label'] = '本机榜单';
+    if (!sharedBoards && attrs['aria-label'] === '全网榜单') attrs['aria-label'] = '本机榜单';
     if (attrs.src === '/assets/ad-free-card.png') attrs.src = 'assets/ad-free-card.png';
-    return { ...node, attrs, children: mobileTemplate(node.children) };
+    return { ...node, attrs, children: mobileTemplate(node.children, sharedBoards) };
   });
 }
 
@@ -59,7 +59,7 @@ function build(options = {}) {
   const assetVersion = encodeURIComponent(JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8')).version);
   const site = options.site || JSON.parse(fs.readFileSync(path.join(__dirname, 'site.json'), 'utf8'));
   const apiOrigin = new URL(site.apiBaseUrl).origin;
-  const template = mobileTemplate(parseWxml(fs.readFileSync(path.join(source, 'pages/index/index.wxml'), 'utf8')));
+  const template = mobileTemplate(parseWxml(fs.readFileSync(path.join(source, 'pages/index/index.wxml'), 'utf8')), true);
   const files = [...listJs(path.join(source, 'game')), ...['storage', 'leaderboard', 'leaderboard-api', 'virtual-pay'].map(name => path.join(source, `services/${name}.js`)), path.join(source, 'pages/index/index.js')];
   const entries = files.map(file => {
     const id = path.relative(source, file).replaceAll('\\', '/').replace(/\.js$/, '');
@@ -70,7 +70,7 @@ function build(options = {}) {
   });
   entries.push('"services/config": function(module) { module.exports = { appId: "", rewardedAdUnitId: "", faultHelpAdUnitId: "", leaderboardApiBaseUrl: "", adCardName: "免广告卡", adCardCardsPerUnit: 10, adCardPriceYuan: 0 }; }');
   let bundled = `(function() {\n'use strict';\nconst modules = {${entries.join(',\n')}};\nconst load = BuyunluRuntime.moduleLoader(modules);\nwindow.wx = BuyunluRuntime.createWx(window);\nlet page;\nwindow.Page = definition => { page = definition; };\nwindow.getCurrentPages = () => page ? [page] : [];\nload('pages/index/index');\nBuyunluOffline.install(page, { core: load('game/core'), storage: load('services/storage'), leaderboard: load('services/leaderboard'), host: window });\nBuyunluRuntime.attachPage(page, { document, root: document.getElementById('app'), template: ${JSON.stringify(template)}, afterRender: () => BuyunluRuntime.updateAccessibility(page, document) });\nwindow.buyunluPage = page;\nwindow.buyunluHandleBack = () => BuyunluOffline.handleBack(page);\npage.onLoad();\nif (page.onShow) page.onShow();\nwindow.addEventListener('pagehide', () => page.onUnload());\ndocument.addEventListener('visibilitychange', () => document.hidden ? page.onHide() : page.onShow && page.onShow());\nwindow.addEventListener('keydown', event => { if (event.key === 'Escape') window.buyunluHandleBack(); if (event.key === 'Tab') BuyunluRuntime.trapFocus(event, document); });\n})();\n`;
-  bundled = bundled.replace('BuyunluRuntime.attachPage(page,', "if (window.BuyunluWebConfig && !window.BuyunluCommerce) throw new Error('购卡组件未能加载，请刷新');\nif (window.BuyunluCommerce) BuyunluCommerce.install(page, { host: window });\nBuyunluRuntime.attachPage(page,");
+  bundled = bundled.replace('BuyunluRuntime.attachPage(page,', "if (window.BuyunluWebConfig && !window.BuyunluCommerce) throw new Error('购卡组件未能加载，请刷新');\nif (window.BuyunluCommerce) BuyunluCommerce.install(page, { host: window, boards: load('services/leaderboard-api') });\nBuyunluRuntime.attachPage(page,");
   fs.mkdirSync(output, { recursive: true });
   fs.mkdirSync(path.join(output, 'assets'), { recursive: true });
   fs.copyFileSync(path.join(source, 'assets/ad-free-card.png'), path.join(output, 'assets/ad-free-card.png'));

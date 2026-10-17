@@ -208,6 +208,34 @@ test('cloud saves isolate verified users and reject stale writes and foreign ori
   assert.equal((await request('/save', { revision: 1, snapshot: { arbitrary: 'secret' } }, a.cookie)).status, 400);
 });
 
+test('public boards reuse existing upstream data without login, identity or write access', async t => {
+  const remoteResult = { ok: true, total: 89433, rank: null, entries: [{ rank: 1, name: '历史玩家', rankIndex: 11, isPlayer: false }] };
+  const { request, forwarded } = await fixture(t, { remoteResult });
+  for (const board of ['leaderboard', 'tigerboard', 'escapeboard']) {
+    const result = await request('/public/' + board + '?clientId=victim&limit=999');
+    assert.equal(result.status, 200); assert.deepEqual(result.body, remoteResult);
+    const remote = new URL(forwarded.at(-1).url);
+    assert.equal(remote.pathname, '/buyunlu-api/' + board);
+    assert.equal(remote.searchParams.get('limit'), '100');
+    assert.equal(remote.searchParams.has('clientId'), false);
+    assert.equal(forwarded.at(-1).options.method, 'GET');
+    assert.equal(forwarded.at(-1).options.body, undefined);
+    assert.equal(forwarded.at(-1).options.headers.Authorization, undefined);
+  }
+  const count = forwarded.length;
+  assert.equal((await request('/public/leaderboard', { clientId: 'victim' })).status, 401);
+  assert.equal((await request('/leaderboard/submit', { clientId: 'victim' })).status, 401);
+  assert.equal(forwarded.length, count);
+});
+
+test('public board upstream failures return a retriable error instead of an empty ranking', async t => {
+  const { request } = await fixture(t, { remoteResult: { ok: false, error: 'upstream private detail' } });
+  const result = await request('/public/leaderboard');
+  assert.equal(result.status, 502);
+  assert.match(result.body.error, /排行榜暂时连接失败/);
+  assert.equal(JSON.stringify(result.body).includes('private detail'), false);
+});
+
 test('shared leaderboard id and name are assigned by server without forwarding email', async t => {
   const { request, forwarded, verified } = await fixture(t);
   assert.equal((await request('/leaderboard/submit', { clientId: 'victim' })).status, 401);
