@@ -55,7 +55,7 @@ function fixture({store=new Map(),state,failAfterDebit=false,user=true,boards,bo
   host.wx.removeStorageSync=()=>{};page.refresh=()=>{};
   page.setData=function(value,callback){Object.assign(this.data,value);callback?.();};
   install(page,{host,boards,storage});
-  return {page,host,store,requests,storage,use:()=>page.consumeAdCard({scene:'promotion',reward:()=>{rewards++;page.data.state.promotionAdWatchCount++;}}),counts:()=>({balance,rewards,debits,opened})};
+  return {page,host,store,requests,storage,failSaves(value){saveFails=value;},use:()=>page.consumeAdCard({scene:'promotion',reward:()=>{rewards++;page.data.state.promotionAdUsedYear=page.data.state.year;page.data.state.promotionAdWatchCount++;}}),counts:()=>({balance,rewards,debits,opened})};
 }
 test('old offline free-card balances cannot become paid cards and guests cannot consume',async()=>{
   const f=fixture({user:false,store:new Map([['buyunlu_mobile_cards_v1','99999']])});
@@ -212,14 +212,41 @@ test('the unified promotion action offers purchase when there is no card and nev
  assert.equal(f.counts().opened,1);assert.equal(f.counts().debits,0);
 });
 
-test('annual promotion already applied or a capped probability never spends another card',async()=>{
+test('annual application and current-rank cap still allow a bonus for future career promotions',async()=>{
  for(const applied of [true,false]){
   const f=fixture();await new Promise(resolve=>setImmediate(resolve));
   if(applied)f.page.data.state.promotionAppliedYear=2026;else f.page.data.promotionChanceText='100%';
-  await f.use();assert.equal(f.counts().debits,0);assert.equal(f.counts().rewards,0);
+  await f.use();assert.equal(f.counts().debits,1);assert.equal(f.counts().rewards,1);
   f.page.showActionSheet({title:'完整晋升路线',content:'',itemList:['查看晋升条件','用免广告卡，晋升概率+3%（剩10张）','看广告，晋升概率+3%']});
-  assert.equal(f.page.sheet.itemList.filter(text=>/广告卡/.test(text)).length,0);
+  assert.equal(f.page.sheet.itemList.filter(text=>/广告卡/.test(text)).length,1);
+  assert.match(f.page.sheet.content,/本局生涯/);
  }
+});
+
+test('a fully boosted career never spends another card',async()=>{
+ const f=fixture();await new Promise(resolve=>setImmediate(resolve));f.page.data.state.promotionAdWatchCount=33;
+ await f.use();assert.equal(f.counts().debits,0);assert.equal(f.counts().rewards,0);
+ f.page.showActionSheet({title:'完整晋升路线',content:'',itemList:['查看晋升条件','看广告，晋升概率+3%']});
+ assert.equal(f.page.sheet.itemList.filter(text=>/广告卡/.test(text)).length,0);
+ assert.match(f.page.sheet.content,/本局.*100%/);
+});
+
+test('upgrading a pending annual receipt grants its missing reward without mistaking an old-year count for completion',async()=>{
+ const request={requestId:crypto.randomUUID(),scene:'promotion',year:2027,rankIndex:1,before:0};
+ const store=new Map([['buyunlu_paid_card_use:one',JSON.stringify({request,applied:[]})]]);
+ const f=fixture({store,state:{year:2027,rankIndex:1,promotionAdUsedYear:2026,promotionAdWatchCount:4}});
+ await new Promise(resolve=>setImmediate(resolve));await f.use();
+ assert.equal(f.counts().rewards,1);assert.equal(f.page.data.state.promotionAdWatchCount,5);assert.equal(f.counts().debits,1);
+});
+
+test('a career reward that cannot be saved stays pending and retries without another debit or bonus',async()=>{
+ const f=fixture({saveFails:true});await new Promise(resolve=>setImmediate(resolve));await f.use();
+ assert.equal(f.counts().debits,1);assert.equal(f.counts().rewards,1);
+ assert.ok(JSON.parse(f.store.get('buyunlu_paid_card_use:one')).request);
+ assert.equal(f.host.BuyunluCardAccount.canChange(),false);
+ f.failSaves(false);await f.use();
+ assert.equal(f.counts().debits,1);assert.equal(f.counts().rewards,1);assert.equal(f.storage.load().promotionAdWatchCount,1);
+ assert.equal(JSON.parse(f.store.get('buyunlu_paid_card_use:one')).request,null);
 });
 
 test('a pending debit blocks promotion and remains confirmable from a capped promotion dialog',async()=>{

@@ -201,6 +201,8 @@ function normalizeState(data) {
   state.quarter = quarter >= 1 && quarter <= 4 ? quarter : 1;
   state.age = Math.max(0, Math.floor(state.age));
   state.year = Math.max(1, Math.floor(state.year));
+  state.promotionAdWatchCount = Math.max(0, Math.floor(state.promotionAdWatchCount));
+  state.promotionAdBonus = state.promotionAdWatchCount * .03;
   state.storyProgress = stories.normalizeProgress(state.storyProgress, state.year);
   state.honorHistory = honors.historyOf(state.honorHistory, state.year);
   state.leaderTrial = honors.trialOf(state.leaderTrial, state.year);
@@ -331,8 +333,9 @@ function promotionChance(nextRankIndex) {
   return ({ 2: .56, 3: .54, 4: .52, 5: .50, 6: .48, 7: .36, 8: .26, 9: .16, 10: .06, 11: .01 })[nextRankIndex] || .56;
 }
 
-function currentPromotionChance(state, nextRankIndex, year = state.year) {
-  const count = state.promotionAdUsedYear === year ? state.promotionAdWatchCount : 0;
+function currentPromotionChance(state, nextRankIndex) {
+  // The stored reward count belongs to this career, not to its current year.
+  const count = Math.max(0, Math.floor(Number(state.promotionAdWatchCount) || 0));
   return Math.min(1, Number((promotionChance(nextRankIndex) + count * .03 + partnerPromotionBonus(state)).toFixed(4)));
 }
 
@@ -1097,8 +1100,8 @@ function finishQuarter(state, rng = Math.random) {
     }
   }
   let promotionText = `年度考核${state.lastReview}（事件绩效${state.lastPerformance >= 0 ? '+' : ''}${state.lastPerformance}，总分${state.review}）${promoted ? `，通过考察晋升至${RANKS[state.rankIndex - 1].name}` : ''}`;
-  const promotionBonusPoints = state.promotionAdUsedYear === completedYear ? state.promotionAdWatchCount * 3 : 0;
-  if (promotionBonusPoints > 0) promotionText += `，含广告累计加成${promotionBonusPoints}%`;
+  const promotionBonusPoints = state.promotionAdWatchCount * 3;
+  if (promotionBonusPoints > 0) promotionText += `，含本局生涯累计加成${promotionBonusPoints}个百分点`;
   promotionText += `；${promotionApplicationText}`;
   const paymentText = loanPayment > 0 ? `，分期还款${loanPayment}元（${loanDetails.join('、')}）` : '';
   // 开销逐项列出：玩家要能对上"钱花在哪"，而不是看到一个总数就完事

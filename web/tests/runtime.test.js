@@ -336,6 +336,23 @@ test('one local card gives one reward, and failed storage or blocked rewards nev
   assert.equal(page.cardBalance(), 0);
 });
 
+test('a new-year promotion reward adds to the same career and a fresh game resets it', () => {
+  const app = cardApp(); const page = app.page;
+  page.buyAdCard(10); page.dialogConfirm();
+  page.usePromotionAdCard();
+  assert.equal(page.data.state.promotionAdWatchCount, 1);
+  page.data.state.year++;
+  page.usePromotionAdCard();
+  assert.equal(page.data.state.promotionAdWatchCount, 2, 'new-year use must not replace the earlier career bonus');
+  assert.match(page.data.adText, /本局.*6个百分/);
+  page.persist();
+  const restored = cardApp(app.saved).page;
+  assert.equal(restored.data.state.promotionAdWatchCount, 2);
+  restored.startFreshGame();
+  assert.equal(restored.data.state.promotionAdWatchCount, 0);
+  assert.equal(restored.cardBalance(), 8, 'unspent cards stay in the separate wallet');
+});
+
 test('web game boots and plays without newer String.replaceAll support', () => {
   const app = cardApp(new Map(), { legacyStrings: true });
   const page = app.page;

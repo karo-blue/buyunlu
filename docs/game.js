@@ -204,6 +204,8 @@ function normalizeState(data) {
   state.quarter = quarter >= 1 && quarter <= 4 ? quarter : 1;
   state.age = Math.max(0, Math.floor(state.age));
   state.year = Math.max(1, Math.floor(state.year));
+  state.promotionAdWatchCount = Math.max(0, Math.floor(state.promotionAdWatchCount));
+  state.promotionAdBonus = state.promotionAdWatchCount * .03;
   state.storyProgress = stories.normalizeProgress(state.storyProgress, state.year);
   state.honorHistory = honors.historyOf(state.honorHistory, state.year);
   state.leaderTrial = honors.trialOf(state.leaderTrial, state.year);
@@ -334,8 +336,9 @@ function promotionChance(nextRankIndex) {
   return ({ 2: .56, 3: .54, 4: .52, 5: .50, 6: .48, 7: .36, 8: .26, 9: .16, 10: .06, 11: .01 })[nextRankIndex] || .56;
 }
 
-function currentPromotionChance(state, nextRankIndex, year = state.year) {
-  const count = state.promotionAdUsedYear === year ? state.promotionAdWatchCount : 0;
+function currentPromotionChance(state, nextRankIndex) {
+  // The stored reward count belongs to this career, not to its current year.
+  const count = Math.max(0, Math.floor(Number(state.promotionAdWatchCount) || 0));
   return Math.min(1, Number((promotionChance(nextRankIndex) + count * .03 + partnerPromotionBonus(state)).toFixed(4)));
 }
 
@@ -1100,8 +1103,8 @@ function finishQuarter(state, rng = Math.random) {
     }
   }
   let promotionText = `年度考核${state.lastReview}（事件绩效${state.lastPerformance >= 0 ? '+' : ''}${state.lastPerformance}，总分${state.review}）${promoted ? `，通过考察晋升至${RANKS[state.rankIndex - 1].name}` : ''}`;
-  const promotionBonusPoints = state.promotionAdUsedYear === completedYear ? state.promotionAdWatchCount * 3 : 0;
-  if (promotionBonusPoints > 0) promotionText += `，含广告累计加成${promotionBonusPoints}%`;
+  const promotionBonusPoints = state.promotionAdWatchCount * 3;
+  if (promotionBonusPoints > 0) promotionText += `，含本局生涯累计加成${promotionBonusPoints}个百分点`;
   promotionText += `；${promotionApplicationText}`;
   const paymentText = loanPayment > 0 ? `，分期还款${loanPayment}元（${loanDetails.join('、')}）` : '';
   // 开销逐项列出：玩家要能对上"钱花在哪"，而不是看到一个总数就完事
@@ -13804,7 +13807,7 @@ Page({
     const state = core.normalizeState(stateOverride || this.data.state || core.newState());
     const rank = core.RANKS[state.rankIndex - 1] || core.RANKS[0];
     const compensation = core.annualCompensation(state);
-    const watchCount = state.promotionAdUsedYear === state.year ? state.promotionAdWatchCount : 0;
+    const watchCount = state.promotionAdWatchCount;
     const net = networkView(state);
     const expenses = core.annualExpenses(state);
     return {
@@ -13830,7 +13833,7 @@ Page({
       ],
       promotionChanceText: state.rankIndex >= core.RANKS.length ? '已达最高职级' : `${Math.floor(core.currentPromotionChance(state, state.rankIndex + 1) * 100)}%`,
       promotionStatusText: state.rankIndex >= core.RANKS.length ? '已达最高职级' : state.promotionAppliedYear === state.year ? '今年已使用' : '今年未使用',
-      adText: `本年度晋升广告加成：已完整观看${watchCount}次，累计 +${watchCount * 3}%（观看次数不限，最终概率最高100%）`,
+      adText: `本局生涯晋升加成：已领取${watchCount}次，累计 +${watchCount * 3}个百分点；跨年、晋升保留，重新开局清零，最终概率最高100%。`,
       navActions: navActionsFor(this.data.activeNav),
       annualPerformanceLabel: `${state.annualPerformance >= 0 ? '+' : ''}${state.annualPerformance}`,
       net,
@@ -14276,8 +14279,8 @@ Page({
     state.promotionAppliedYear = state.year;
     const chance = core.currentPromotionChance(state, state.rankIndex + 1);
     if (Math.random() >= chance) { state.lastResult = '本次晋升考察暂未通过，你的任职资历会继续保留。'; core.addRecord(state, `参加${next.name}晋升考察，本次暂未通过。`); this.persist(); return this.showModal({ title: '晋升结果', content: `本次考察暂未通过。\n当前晋升机会为${Math.floor(chance * 100)}%，资历和属性不会扣除。\n继续保持良好考核，可在后续年度再次争取。`, showCancel: false }); }
-    const bonusPoints = state.promotionAdUsedYear === state.year ? state.promotionAdWatchCount * 3 : 0;
-    const bonusText = bonusPoints > 0 ? `（含广告累计加成${bonusPoints}%）` : '';
+    const bonusPoints = state.promotionAdWatchCount * 3;
+    const bonusText = bonusPoints > 0 ? `（含本局生涯累计加成${bonusPoints}个百分点）` : '';
     state.rankIndex += 1; state.rankYears = 0; state.previousPosition = state.currentPosition; state.currentPosition = state.rankIndex >= 3 ? '待选择具体岗位' : '非领导职级'; state.dutyType = core.RANKS[state.rankIndex - 1].dutyType; state.lastResult = `通过竞争与考察，你迎来了新的职级变化。${bonusText}`; core.addRecord(state, `以${Math.floor(chance * 100)}%晋升机会${bonusText}晋升至${core.RANKS[state.rankIndex - 1].name}。`); this.persist(); this.choosePosition(() => this.showPromotionResult());
   },
 
@@ -14302,13 +14305,13 @@ Page({
 
   grantPromotionBonus() {
     const state = this.data.state;
-    if (state.promotionAdUsedYear !== state.year) { state.promotionAdUsedYear = state.year; state.promotionAdWatchCount = 0; state.promotionAdBonus = 0; }
+    state.promotionAdUsedYear = state.year;
     state.promotionAdWatchCount += 1;
     state.promotionAdBonus = state.promotionAdWatchCount * 0.03;
     // 走卡还是走广告都会走到这里，记录文案不区分渠道，免得履历里出现自相矛盾的描述
-    core.addRecord(state, `领取本年度晋升激励加成，累计增加${state.promotionAdWatchCount * 3}%。`);
+    core.addRecord(state, `领取本局生涯晋升加成，累计增加${state.promotionAdWatchCount * 3}个百分点；跨年与晋升后保留。`);
     this.persist();
-    wx.showToast({ title: '晋升概率 +3%', icon: 'success' });
+    wx.showToast({ title: '本局晋升概率 +3个百分点', icon: 'success' });
   },
 
   handleMetricAction(event) {

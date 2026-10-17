@@ -60,8 +60,8 @@
     page.buildPatch = function(...args) {
       const patch = originalPatch.apply(this, args);
       const state = patch.state;
-      const count = state.promotionAdUsedYear === state.year ? state.promotionAdWatchCount : 0;
-      patch.adText = `本年度免费晋升加成：已领取${count}次，累计 +${count * 3}%（领取次数不限，最终概率最高100%）。离线版无广告、无付费。`;
+      const count = state.promotionAdWatchCount;
+      patch.adText = `本局免费晋升加成：已领取${count}次，累计 +${count * 3}个百分点；跨年、晋升保留，重新开局清零，最终概率最高100%。离线版无广告、无付费。`;
       patch.lastResult = visibleText(patch.lastResult);
       patch.honor.requirement = visibleText(patch.honor.requirement);
       return patch;

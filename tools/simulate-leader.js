@@ -65,8 +65,8 @@ function play({ seed = 1, ads = 0, strategy = 'expert', trace = false } = {}) {
     // 对应页面每自然年一次免费锻炼、一次医院服务；不购房车，不恋爱结婚。
     if (state.health <= 97) core.restoreHealth(state, 'exercise', 0, 3);
     if (state.health < 82) core.restoreHealth(state, 'hospital', 12000, 18);
-    // 与页面 applyPromotionAdBonus 的发奖字段一致；每年固定次数，不用请托晋升。
-    if (state.rankIndex < 11 && state.promotionAdUsedYear !== state.year && ads > 0) {
+    // 整局只领取指定次数，后续年度和职级继续使用同一份生涯加成。
+    if (state.rankIndex < 11 && state.promotionAdWatchCount === 0 && ads > 0) {
       state.promotionAdUsedYear = state.year;
       state.promotionAdWatchCount = ads;
       state.promotionAdBonus = ads * 0.03;
@@ -155,7 +155,7 @@ if (require.main === module) {
   if (output) {
     const target = path.resolve(output);
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, JSON.stringify({ assumptions: '独身、清正、无读档无请托；熟悉选项与跨年任务；每年晋升广告成功发奖指定次数；每年健康管理；不模拟广告库存/支付/真人失误', results }, null, 2));
+    fs.writeFileSync(target, JSON.stringify({ assumptions: '独身、清正、无读档无请托；熟悉选项与跨年任务；整局领取指定次数的生涯晋升加成；每年健康管理；不模拟广告库存/支付/真人失误', results }, null, 2));
   }
 }
 

@@ -10,6 +10,8 @@ test('完整人生模拟从真实新局出发，可按种子重放', () => {
   assert.equal(a.start.rankIndex, 1);
   assert.equal(a.start.achievements, 0);
   assert.equal(a.state.ended, true);
+  assert.equal(a.adRewards, 10, '指定次数为整局累计，不应每年重复领卡');
+  assert.equal(a.state.promotionAdWatchCount, 10);
   assert.ok(a.quarters <= 172);
 });
 

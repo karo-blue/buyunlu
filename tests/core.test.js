@@ -31,6 +31,8 @@ test('promotion qualification keeps all gates', () => {
   const state = core.newState();
   const next = core.RANKS[1];
   assert.equal(core.isQualified(state, next), false);
+  state.promotionAdWatchCount = 33;
+  assert.equal(core.isQualified(state, next), false, '100% probability cannot bypass qualification gates');
   Object.assign(state, { age: 23, rankYears: 1, review: 62, reputation: 32, network: 16, achievements: 1 });
   assert.equal(core.isQualified(state, next), true);
   state.integrity = 59;
@@ -47,6 +49,31 @@ test('promotion chances are slightly higher and rewarded ads add three percentag
   assert.equal(core.currentPromotionChance(state, 8), 0.29);
   state.promotionAdWatchCount = 20;
   assert.equal(core.currentPromotionChance(state, 2), 1);
+});
+
+test('promotion card bonuses last for the career across years, ranks and saved state', () => {
+  let state = core.newState();
+  Object.assign(state, { promotionAdUsedYear: 2026, promotionAdWatchCount: 2, promotionAdBonus: .06 });
+  for (const year of [2026, 2027, 2040]) {
+    state.year = year;
+    for (let rank = 2; rank <= core.RANKS.length; rank++) {
+      state.rankIndex = rank - 1;
+      assert.equal(core.currentPromotionChance(state, rank), Number((core.promotionChance(rank) + .06).toFixed(4)));
+    }
+    state = core.normalizeState(JSON.parse(JSON.stringify(state)));
+    assert.equal(state.promotionAdWatchCount, 2);
+  }
+  assert.equal(core.newState().promotionAdWatchCount, 0, 'a fresh career has no inherited bonus');
+});
+
+test('an annual promotion can use a bonus earned in an earlier year', () => {
+  const state = core.newState();
+  Object.assign(state, { year: 2027, quarter: 4, age: 24, rankYears: 2, review: 90, integrity: 100, reputation: 100, network: 100, seniority: 100, health: 100, achievements: 10, promotionAdUsedYear: 2026, promotionAdWatchCount: 1 });
+  const result = core.finishQuarter(state, () => .58);
+  assert.equal(result.annual, true);
+  assert.equal(result.promoted, true, '56% base plus 3 career points passes a 58% roll');
+  assert.equal(state.promotionAdWatchCount, 1);
+  assert.match(state.lastResult, /本局.*3个百分/);
 });
 
 test('asking a leader for help succeeds ninety percent of the time', () => {

@@ -57,8 +57,7 @@
     function promotionBlocked(){
       const state=page.data.state;
       if(state.ended||state.rankIndex>=11)return '当前无需晋升加成，未扣卡';
-      if(state.promotionAppliedYear===state.year)return '本年度已申请晋升，下一年度再使用广告卡，未扣卡';
-      if(parseFloat(page.data.promotionChanceText)>=100)return '晋升概率已达100%，无需用卡，未扣卡';
+      if(state.promotionAdWatchCount>=33)return '本局各职级晋升概率已达100%，无需再用卡，未扣卡';
       return '';
     }
     page.consumeAdCard=async function(options={}){
@@ -75,7 +74,7 @@
         if(options.scene==='promotion'&&!record.request&&promotionBlocked())return host.wx.showToast({title:promotionBlocked()});
         if(record.request&&(record.request.scene||'promotion')!==options.scene)return this.showAdCard();
         if(!record.request)record.request=options.scene==='load'?{requestId:host.crypto.randomUUID(),scene:'load',slot:options.slot,snapshot:options.snapshot}:
-          {requestId:host.crypto.randomUUID(),scene:'promotion',year:state.year,rankIndex:state.rankIndex,before:state.promotionAdUsedYear===state.year?state.promotionAdWatchCount:0};
+          {requestId:host.crypto.randomUUID(),scene:'promotion',bonusScope:'career',year:state.year,rankIndex:state.rankIndex,before:state.promotionAdWatchCount||0};
         const request=record.request;
         if(options.scene==='promotion'&&(request.year!==state.year||request.rankIndex!==state.rankIndex))return host.wx.showToast({title:'请先恢复上次用卡时的游戏进度'});
         try{save();}catch{return host.wx.showToast({title:'本机存储不可用，未提交扣卡'});}
@@ -84,8 +83,10 @@
           if(account.user?.id!==owner)return;
           this.setPay({balance:result.balance});
           const current=this.data.state;
-          const alreadyApplied=options.scene==='load'?current._paidLoadRequest===request.requestId:current.promotionAdUsedYear===request.year&&current.promotionAdWatchCount>request.before;
+          const alreadyApplied=options.scene==='load'?current._paidLoadRequest===request.requestId:
+            (request.bonusScope==='career'||current.promotionAdUsedYear===request.year)&&current.promotionAdWatchCount>request.before;
           if(!record.applied.includes(request.requestId)&&!alreadyApplied){options.reward(request);}
+          if(options.scene==='promotion'&&storage&&!storage.save(this.data.state))throw new Error('生涯加成尚未保存，请释放本机存储后重试，不会重复扣卡');
           record.applied=[...record.applied.slice(-99),request.requestId];record.request=null;save();
         }catch(cause){
           if(account.user?.id!==owner)return;
@@ -108,7 +109,7 @@
         const entries=next.itemList.map((label,index)=>({label,index})).filter(item=>!/^(用免广告卡|看广告|免费领取|使用广告卡).*晋升/.test(item.label));
         if(!blocked||pending)entries.push({label:pending?'确认上次用卡（不重复扣卡）':balance>0?'使用1张广告卡（余额'+balance+'张）':account.user?.emailVerified?'购买广告卡':'登录购买广告卡',card:true});
         next.tone='promotion';next.itemList=entries.map(item=>item.label);
-        next.content=String(next.content||'').replace(this.data.adText||'','').replace(/^满足资历[^\n]*\n/,'').trim()+'\n\n广告卡余额：'+balance+'张。'+(blocked?blocked.replace('，未扣卡','')+'。':'每张增加3个百分点，不保证晋升成功。');
+        next.content=String(next.content||'').replace(this.data.adText||'','').replace(/^满足资历[^\n]*\n/,'').trim()+'\n\n本局生涯加成：+'+(this.data.state.promotionAdWatchCount||0)*3+'个百分点。跨年、晋升保留，重开清零。\n广告卡余额：'+balance+'张。'+(blocked?blocked.replace('，未扣卡','')+'。':'每张+3个百分点，最终概率最高100%，仍需满足晋升条件。');
         next.success=result=>{
           const entry=entries[result.tapIndex];if(!entry)return;
           if(entry.card)return pending||this.cardBalance()>0?this.usePromotionAdCard():account.checkout();
@@ -118,7 +119,7 @@
       return showActions.call(this,next,extra);
     };
     const patch=page.buildPatch;
-    page.buildPatch=function(...args){const result=patch.apply(this,args);result.adText='每张广告卡可增加晋升概率3个百分点，或读取一次本机存档；不保证晋升成功。每张0.1元，最低1元买10张，余额按购卡账号保存。';return result;};
+    page.buildPatch=function(...args){const result=patch.apply(this,args);const state=result.state||this.data.state;result.adText='本局生涯晋升加成：+'+(state.promotionAdWatchCount||0)*3+'个百分点。每张广告卡+3个百分点，跨年、晋升保留，重新开局清零；最终概率最高100%，仍需满足晋升条件。也可用1张卡读取本机存档。';return result;};
     for(const method of ['startFreshGame','startQuarter','tryPromotion']){
       const original=page[method];
       page[method]=function(...args){if(record.request||this._payBusy)return this.showAdCard();return original.apply(this,args);};
