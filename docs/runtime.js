@@ -84,9 +84,16 @@
       element.addEventListener(domEvent, event => {
         const handler = element.__bindings[binding];
         if (!handler) return;
-        if (binding.startsWith('catch')) { event.stopPropagation(); if (domEvent === 'touchmove') event.preventDefault(); }
+        if (binding.startsWith('catch')) {
+          event.stopPropagation();
+          if (domEvent === 'touchmove') {
+            const scroll = event.target.closest?.('[data-scroll]');
+            // A modal catches backdrop gestures without cancelling native panning inside it.
+            if (!scroll || !element.contains(scroll)) event.preventDefault();
+          }
+        }
         if (typeof page[handler] === 'function') page[handler]({ currentTarget: { dataset: element.dataset }, target: { dataset: event.target.dataset || {} }, detail: { value: event.target.value } });
-      });
+      }, domEvent === 'touchmove' && binding.startsWith('catch') ? { passive: false } : undefined);
     }
   }
 
@@ -160,7 +167,9 @@
     if (scroll) scroll.inert = !!active;
     if (active && active !== document.__activeDialog) {
       document.__returnFocus = document.activeElement;
-      active.querySelector?.('button,select,input')?.focus();
+      const innerScroll = active.querySelector?.('[data-scroll]');
+      if (innerScroll) innerScroll.scrollTop = 0;
+      active.querySelector?.('button,select,input')?.focus({ preventScroll: true });
     } else if (!active && document.__activeDialog) document.__returnFocus?.focus?.();
     document.__activeDialog = active;
   }

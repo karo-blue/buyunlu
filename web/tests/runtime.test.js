@@ -15,6 +15,8 @@ class Element {
   setAttribute(name, value) { this.attributes[name] = String(value); if (name.startsWith('data-')) this.dataset[name.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = String(value); }
   removeAttribute(name) { delete this.attributes[name]; }
   getAttribute(name) { return this.attributes[name] ?? null; }
+  closest(selector) { for (let node = this; node; node = node.parentNode) if (selector === '[data-scroll]' && node.getAttribute?.('data-scroll') != null) return node; return null; }
+  contains(node) { for (; node; node = node.parentNode) if (node === this) return true; return false; }
   addEventListener(name, listener) { this.listeners[name] = listener; }
   focus() { this.ownerDocument.activeElement = this; }
   dispatch(name, detail = {}) { this.listeners[name]?.({ currentTarget: this, target: this, stopPropagation() {}, preventDefault() {}, ...detail }); }
@@ -78,6 +80,50 @@ test('picker emits a string index and catchtap stops bubbling', () => {
   assert.equal(chosen, '1');
   nodes(root, x => x.tagName === 'BUTTON')[0].dispatch('click', { stopPropagation() { stopped = true; } });
   assert.equal(chosen, '4'); assert.equal(stopped, true);
+});
+
+test('modal touch guard allows native panning from nested scroll content and buttons', () => {
+  const { doc, root } = dom();
+  const ast = parseWxml('<view catchtouchmove="true"><scroll-view scroll-y><text>长内容</text><button>选择</button></scroll-view></view>');
+  runtime.attachPage({ data: {} }, { document: doc, root, template: ast });
+  const mask = root.childNodes[0], scroll = mask.childNodes[0];
+  for (const target of [scroll, ...scroll.childNodes]) {
+    let stopped = false, prevented = false;
+    mask.dispatch('touchmove', { target, stopPropagation() { stopped = true; }, preventDefault() { prevented = true; } });
+    assert.equal(stopped, true, 'touch must not propagate to the background');
+    assert.equal(prevented, false, 'native scroll must remain available');
+  }
+});
+
+test('modal touch guard still prevents backdrop panning and unrelated scroll areas', () => {
+  const { doc, root } = dom();
+  const ast = parseWxml('<view catchtouchmove="true"><text>标题</text></view><scroll-view scroll-y />');
+  runtime.attachPage({ data: {} }, { document: doc, root, template: ast });
+  const mask = root.childNodes[0];
+  for (const target of [mask, mask.childNodes[0], root.childNodes[1]]) {
+    let prevented = false;
+    mask.dispatch('touchmove', { target, preventDefault() { prevented = true; } });
+    assert.equal(prevented, true, 'only an inner scroll area can pan');
+  }
+});
+
+test('opening a dialog starts at the top while ordinary updates preserve its scroll position', () => {
+  const innerScroll = { scrollTop: 300 }, background = {};
+  let focusOptions, returned = false;
+  const button = { focus(options) { focusOptions = options; } };
+  const card = { parentNode: { className: 'dialog-mask-open', setAttribute() {} }, setAttribute() {}, querySelector(selector) { return selector === '[data-scroll]' ? innerScroll : button; } };
+  const doc = { activeElement: { focus() { returned = true; } }, querySelectorAll() { return [card]; }, querySelector() { return background; } };
+  runtime.updateAccessibility({}, doc);
+  assert.equal(innerScroll.scrollTop, 0);
+  assert.deepEqual(focusOptions, { preventScroll: true });
+  assert.equal(background.inert, true);
+  innerScroll.scrollTop = 120;
+  runtime.updateAccessibility({}, doc);
+  assert.equal(innerScroll.scrollTop, 120, 'state refresh must not jump the reader to the top');
+  card.parentNode.className = 'dialog-mask';
+  runtime.updateAccessibility({}, doc);
+  assert.equal(background.inert, false);
+  assert.equal(returned, true);
 });
 
 test('rpx scales to viewport with a capped width, including negative values in calc', () => {
