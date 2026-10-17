@@ -15,6 +15,26 @@ test('payment API uses the configured server without cookies, stores only opaque
   assert.equal(JSON.stringify([...storage.values()]).includes('test-only-password'),false);
   token=null;status=401;await assert.rejects(api.request('/account'));assert.equal(api.hasSession(),false);
 });
+test('API resumes the latest session from another tab and an old 401 cannot clear a newer login',async()=>{
+ const key='buyunlu_web_session_v1',storage=new Map([[key,'a'.repeat(43)]]),calls=[];let reply;
+ const host={localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},AbortController,setTimeout,clearTimeout,
+  fetch:async(url,options)=>{calls.push(options.headers.Authorization);return new Promise(resolve=>{reply=resolve;});}};
+ const api=createAPI(host,{apiBaseUrl:'https://backend.example/api'});
+ storage.set(key,'b'.repeat(43));
+ const first=api.request('/account');assert.equal(calls[0],'Bearer '+'b'.repeat(43));
+ storage.set(key,'c'.repeat(43));reply({ok:false,status:401,headers:{get:()=>null},json:async()=>({error:'expired'})});
+ await assert.rejects(first);assert.equal(storage.get(key),'c'.repeat(43));
+ const next=api.request('/account');assert.equal(calls[1],'Bearer '+'c'.repeat(43));
+ reply({ok:true,status:200,headers:{get:()=>null},json:async()=>({ok:true})});await next;
+});
+
+test('a temporary connection failure preserves the remembered session',async()=>{
+ const key='buyunlu_web_session_v1',storage=new Map([[key,'a'.repeat(43)]]);
+ const host={localStorage:{getItem:k=>storage.get(k),removeItem:k=>storage.delete(k)},AbortController,setTimeout,clearTimeout,fetch:async()=>{throw new TypeError('offline');}};
+ const api=createAPI(host,{apiBaseUrl:'https://backend.example/api'});
+ await assert.rejects(api.request('/account'));assert.equal(api.hasSession(),true);
+});
+
 function fixture({store=new Map(),state,failAfterDebit=false,user=true,boards,boardRequest}={}){
   let balance=10,rewards=0,debits=0,opened=0;const spent=new Set(),requests=[];
   const host={crypto,localStorage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)},wx:{showToast(){}},

@@ -14875,6 +14875,7 @@ window.buyunluHandleBack = () => BuyunluOffline.handleBack(page);
 page.onLoad();
 if (page.onShow) page.onShow();
 window.addEventListener('pagehide', () => page.onUnload());
+window.addEventListener('pageshow', event => { if (event.persisted && page.onShow) page.onShow(); });
 document.addEventListener('visibilitychange', () => document.hidden ? page.onHide() : page.onShow && page.onShow());
 window.addEventListener('keydown', event => { if (event.key === 'Escape') window.buyunluHandleBack(); if (event.key === 'Tab') BuyunluRuntime.trapFocus(event, document); });
 })();

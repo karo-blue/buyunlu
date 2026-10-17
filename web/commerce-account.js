@@ -3,7 +3,23 @@
   const byId = id => document.getElementById(id), api = window.BuyunluAPI.request;
   const screen = byId('commerce-account');
   let registering = false, busy = false, afterLogin = false, retryAt = 0, opener, verificationEmail = '';
-  const controller = window.BuyunluCardAccount = { user: null, onChange() {}, open, checkout, ready: null };
+  const controller = window.BuyunluCardAccount = { user: null, onChange() {}, open, checkout, restore, ready: null };
+  let restoring;
+  function restore() {
+    if (restoring) return restoring;
+    restoring = (async () => {
+      const previous = controller.user;
+      let user = null;
+      if (window.BuyunluAPI.hasSession()) {
+        try { user = (await api('/account')).user; }
+        catch (cause) { if (cause.status !== 401) throw cause; }
+      }
+      controller.user = user;
+      if (previous?.id !== user?.id || previous?.emailVerified !== user?.emailVerified) controller.onChange();
+      return user;
+    })().finally(() => { restoring = null; });
+    return restoring;
+  }
   function error(cause) { byId('commerce-error').textContent = cause.message || '暂时无法连接服务，请重试'; }
   function lock(value) { busy = value; screen.setAttribute('aria-busy', String(value)); for (const button of screen.querySelectorAll('button')) button.disabled = value;
     if(value)byId('commerce-status').textContent='正在处理，请稍候…';else if(byId('commerce-status').textContent==='正在处理，请稍候…')byId('commerce-status').textContent=''; }
@@ -36,7 +52,12 @@
     byId('commerce-current').textContent = controller.user ? '当前购卡账号：' + controller.user.username : '';
     byId('commerce-username').focus();
   }
-  async function checkout() { await controller.ready; if (controller.user?.emailVerified) returnToCheckout(); else open(true); }
+  async function checkout() {
+    await controller.ready;
+    try { await restore(); }
+    catch { return window.wx?.showToast({ title: '账号服务暂时连接失败，请稍后重试，无需重新登录' }); }
+    if (controller.user?.emailVerified) returnToCheckout(); else open(true);
+  }
   byId('commerce-close').addEventListener('click', close);
   byId('commerce-toggle').addEventListener('click', () => {
     registering = !registering;
@@ -96,7 +117,7 @@
       else if(!event.shiftKey&&document.activeElement===controls[controls.length-1]){event.preventDefault();controls[0].focus();}
     }
   });
-  controller.ready = (window.BuyunluAPI.hasSession() ? api('/account').then(result=>{controller.user=result.user;}) : Promise.resolve()).catch(()=>{}).then(()=>{
+  controller.ready = restore().catch(()=>{}).then(()=>{
     const query=new URLSearchParams(location.search);
     if(query.get('checkout')==='1') checkout(); else if(query.get('account')==='1') open();
   });

@@ -7,12 +7,18 @@ test('GitHub frontend sessions work without third-party cookies and reject other
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'buyunlu-cors-'));
   const frontend = 'https://frontend.example', backend = 'https://backend.example';
   let code;
-  const server = createServer({ dataDir, origin: backend, frontendUrl: frontend + '/buyunlu/',
+  const serverOptions = { dataDir, origin: backend, frontendUrl: frontend + '/buyunlu/',
     fetch: async () => ({ ok: true, json: async () => ({ ok: true, total: 3, entries: [{ rank: 1, name: '历史玩家' }] }) }),
-    sendVerificationEmail: async value => { code = value.code; } });
+    sendVerificationEmail: async value => { code = value.code; } };
+  let server = createServer(serverOptions);
   await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));fs.rmSync(dataDir,{recursive:true,force:true});});
-  const base = `http://127.0.0.1:${server.address().port}/api`;
+  let base = `http://127.0.0.1:${server.address().port}/api`;
+  async function restart() {
+    server.closeAllConnections(); await new Promise(resolve=>server.close(resolve));
+    server=createServer(serverOptions);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+    base=`http://127.0.0.1:${server.address().port}/api`;
+  }
   const call = (route, body, token, origin = frontend) => fetch(base + route, {
     method: body === undefined ? 'GET' : 'POST', headers: { Origin:origin, 'Sec-Fetch-Site':'cross-site',
       'Content-Type':'application/json', ...(token?{Authorization:'Bearer '+token}:{}) },
@@ -35,12 +41,14 @@ test('GitHub frontend sessions work without third-party cookies and reject other
   const verified = await call('/email/verify',{code},token);
   assert.equal(verified.status,200);
   const next = verified.headers.get('x-buyunlu-session'); assert.notEqual(next,token);
+  await restart();
   assert.equal((await call('/account',undefined,token)).status,401);
   assert.equal((await call('/account',undefined,next)).status,200);
   assert.equal((await call('/account',undefined,next,'https://evil.example')).status,401);
   assert.equal((await call('/save',{revision:0,snapshot:{}},next,'https://evil.example')).status,403);
   assert.equal((await call('/save',{revision:0,snapshot:{}},next)).status,200);
   assert.equal((await call('/logout',{},next)).status,200);
+  await restart();
   assert.equal((await call('/account',undefined,next)).status,401);
   const emailLogin=await call('/login',{username:'TESTER@EXAMPLE.TEST',password:'long password 123'});
   assert.equal(emailLogin.status,200);

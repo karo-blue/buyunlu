@@ -37,10 +37,11 @@
     page.cardBalance=function(){return Number.isSafeInteger(this._payRaw?.balance)&&this._payRaw.balance>0?this._payRaw.balance:0;};
     page.refreshPayBalance=async function(){
       await account.ready;
+      try{await account.restore?.();}catch{return {ok:false};}
       if(!account.user?.emailVerified){this.setPay({balance:0});return {ok:false};}
       const owner=account.user.id;
       try{const result=await api('/pay/balance');if(account.user?.id===owner)this.setPay({balance:result.balance});return result;}
-      catch(cause){if(account.user?.id===owner)this.setPay({balance:0});return {ok:false};}
+      catch(cause){if(cause.status===401&&account.user?.id===owner){this.setPay({balance:0});try{await account.restore?.();}catch{}}return {ok:false};}
     };
     page.refreshPay=async function(){
       await account.ready;

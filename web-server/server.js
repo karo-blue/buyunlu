@@ -6,7 +6,8 @@ const crypto = require('node:crypto');
 const { promisify } = require('node:util');
 const scrypt = promisify(crypto.scrypt);
 const SAVE_KEYS = new Set(['buyunlu_save_v1', 'buyunlu_save_slots_v1', 'buyunlu_local_history_v1', 'buyunlu_h5_pending_v1']);
-const SESSION_AGE = 7 * 24 * 3600 * 1000;
+const SESSION_AGE = 30 * 24 * 3600 * 1000;
+const SESSION_RENEW_AFTER = 24 * 3600 * 1000;
 const VERIFICATION_AGE = 10 * 60 * 1000;
 const RESEND_DELAY = 60 * 1000;
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -57,10 +58,19 @@ function createServer(options = {}) {
   const payments = options.payments || require('./alipay').createPayments({ dataDir, origin, basePath, frontendUrl });
   const accountsFile = path.join(dataDir, 'accounts.json');
   const accounts = readFile(accountsFile, []);
-  const sessions = new Map(); const limits = new Map();
+  const sessionsFile = path.join(dataDir, 'sessions.json');
+  const sessions = new Map(readFile(sessionsFile, []).filter(([key, session]) => /^[a-f0-9]{64}$/.test(key) && session && Number.isSafeInteger(session.expires) && session.expires > now()));
+  const limits = new Map();
   const reservedUsernames = new Set(); const reservedEmails = new Set(); const accountLocks = new Map();
   let passwordWork = 0;
   const persistAccounts = () => atomicWrite(accountsFile, accounts);
+  function updateSessions(change) {
+    const previous = new Map(sessions);
+    change();
+    try { atomicWrite(sessionsFile, [...sessions]); }
+    catch (cause) { sessions.clear(); for (const [key, session] of previous) sessions.set(key, session); throw cause; }
+  }
+  const sessionCookie = token => `buyunlu_session=${token}; HttpOnly; SameSite=Strict; Path=${basePath}; Max-Age=${SESSION_AGE / 1000}${secure ? '; Secure' : ''}`;
   function json(response, status, value) {
     response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     response.end(JSON.stringify(value));
@@ -68,20 +78,29 @@ function createServer(options = {}) {
   function setSession(response, user, request) {
     const token = crypto.randomBytes(32).toString('base64url');
     const timestamp = now();
-    for (const [key, session] of sessions) if (session.expires <= timestamp) sessions.delete(key);
     const crossOrigin = frontendOrigin !== origin && request.headers.origin === frontendOrigin;
-    sessions.set(hash(token), { id: user.id, expires: timestamp + SESSION_AGE, ...(crossOrigin ? { clientOrigin: frontendOrigin } : {}) });
+    updateSessions(() => {
+      for (const [key, session] of sessions) if (session.expires <= timestamp) sessions.delete(key);
+      sessions.set(hash(token), { id: user.id, version: user.sessionVersion || 0, expires: timestamp + SESSION_AGE, ...(crossOrigin ? { clientOrigin: frontendOrigin } : {}) });
+    });
     if (crossOrigin) { response.setHeader('X-Buyunlu-Session', token); return; }
-    response.setHeader('Set-Cookie', `buyunlu_session=${token}; HttpOnly; SameSite=Strict; Path=${basePath}; Max-Age=${SESSION_AGE / 1000}${secure ? '; Secure' : ''}`);
+    response.setHeader('Set-Cookie', sessionCookie(token));
   }
-  function sessionKey(request) {
-    if (request.headers.authorization) return hash(String(request.headers.authorization).match(/^Bearer ([A-Za-z0-9_-]{43})$/)?.[1] || '');
-    if (frontendOrigin !== origin && request.headers.origin === frontendOrigin) return hash('');
-    return hash((request.headers.cookie || '').match(/(?:^|;\s*)buyunlu_session=([^;]*)/)?.[1] || '');
+  function sessionToken(request) {
+    if (request.headers.authorization) return String(request.headers.authorization).match(/^Bearer ([A-Za-z0-9_-]{43})$/)?.[1] || '';
+    if (frontendOrigin !== origin && request.headers.origin === frontendOrigin) return '';
+    return (request.headers.cookie || '').match(/(?:^|;\s*)buyunlu_session=([A-Za-z0-9_-]{43})(?:;|$)/)?.[1] || '';
   }
-  function currentUser(request) {
-    const session = sessions.get(sessionKey(request));
-    return session && session.expires > now() && (!session.clientOrigin || session.clientOrigin === request.headers.origin) ? accounts.find(user => user.id === session.id) : null;
+  function sessionKey(request) { return hash(sessionToken(request)); }
+  function currentUser(request, response) {
+    const key = sessionKey(request), session = sessions.get(key);
+    const user = session && session.expires > now() && (!session.clientOrigin || session.clientOrigin === request.headers.origin) ? accounts.find(user => user.id === session.id) : null;
+    if (!user || (session.version || 0) !== (user.sessionVersion || 0)) return null;
+    if (session.expires - now() <= SESSION_AGE - SESSION_RENEW_AFTER) {
+      updateSessions(() => sessions.set(key, { ...session, expires: now() + SESSION_AGE }));
+      if (!session.clientOrigin) response.setHeader('Set-Cookie', sessionCookie(sessionToken(request)));
+    }
+    return user;
   }
   function rateLimit(key, maximum, window = 15 * 60 * 1000) {
     const timestamp = now();
@@ -181,8 +200,8 @@ function createServer(options = {}) {
       }
       if (request.method === 'POST' && !crossOrigin && (request.headers.origin !== origin || request.headers['sec-fetch-site'] === 'cross-site')) throw error(403, '请求来源不受信任');
       if (route === '/health' && request.method === 'GET') return json(response, 200, { ok: true, service: 'buyunlu-h5' });
-      if (route === '/pay/status' && request.method === 'GET') return json(response, 200, payments.status(currentUser(request)));
-      const user = currentUser(request);
+      if (route === '/pay/status' && request.method === 'GET') return json(response, 200, payments.status(currentUser(request, response)));
+      const user = currentUser(request, response);
       // Nginx must replace X-Real-IP; the service binds only to loopback.
       const ip = String(request.headers['x-real-ip'] || request.socket.remoteAddress);
       const publicBoard = route.match(/^\/public\/(leaderboard|tigerboard|escapeboard)$/);
@@ -237,7 +256,7 @@ function createServer(options = {}) {
       rateLimit('api:' + user.id, 240, 60000);
       if (route === '/account' && request.method === 'GET') return json(response, 200, accountResponse(user));
       if (route === '/logout' && request.method === 'POST') {
-        sessions.delete(sessionKey(request));
+        updateSessions(() => sessions.delete(sessionKey(request)));
         response.setHeader('Set-Cookie', `buyunlu_session=; HttpOnly; SameSite=Strict; Path=${basePath}; Max-Age=0${secure ? '; Secure' : ''}`);
         return json(response, 200, { ok: true });
       }
@@ -274,9 +293,11 @@ function createServer(options = {}) {
           }
           // Keep the ownership check and commit synchronous so concurrent proofs cannot both win.
           assertEmailAvailable(user.email, user);
+          const previousSessionVersion = user.sessionVersion || 0;
+          user.sessionVersion = previousSessionVersion + 1;
           user.emailVerified = true; user.emailVerifiedAt = new Date(now()).toISOString(); delete user.emailVerification;
           try { persistAccounts(); }
-          catch (cause) { user.emailVerified = false; delete user.emailVerifiedAt; user.emailVerification = challenge; throw cause; }
+          catch (cause) { user.sessionVersion = previousSessionVersion; user.emailVerified = false; delete user.emailVerifiedAt; user.emailVerification = challenge; throw cause; }
           // Invalidate every unverified session before issuing a fresh verified session.
           for (const [key, session] of sessions) if (session.id === user.id) sessions.delete(key);
           setSession(response, user, request);

@@ -42,6 +42,69 @@ async function fixture(t, options = {}) {
   return { request, directory, forwarded, messages, verified, advance: milliseconds => { now += milliseconds; }, restart: async () => { await close(); await start(); } };
 }
 
+test('login sessions survive restarts and logout remains revoked after restart without saving raw tokens', async t => {
+  const { request, verified, restart, directory } = await fixture(t);
+  const account = await verified();
+  const token = account.cookie.match(/buyunlu_session=([^;]+)/)[1];
+  assert.match(account.cookie, /Max-Age=2592000/);
+  const file = path.join(directory, 'sessions.json');
+  assert.equal(fs.readFileSync(file, 'utf8').includes(token), false);
+  assert.equal(fs.readFileSync(file, 'utf8').includes('long password 123'), false);
+  await restart();
+  assert.equal((await request('/account', undefined, account.cookie)).status, 200);
+  await request('/logout', {}, account.cookie);
+  await restart();
+  assert.equal((await request('/account', undefined, account.cookie)).status, 401);
+});
+
+test('active sessions roll forward for 30 days and inactive expired sessions are rejected', async t => {
+  const { request, verified, restart, advance } = await fixture(t);
+  const account = await verified();
+  advance(29 * 86400000);
+  const active = await request('/account', undefined, account.cookie);
+  assert.equal(active.status, 200); assert.match(active.cookie, /Max-Age=2592000/);
+  await restart(); advance(29 * 86400000);
+  assert.equal((await request('/account', undefined, account.cookie)).status, 200);
+  advance(31 * 86400000);
+  assert.equal((await request('/account', undefined, account.cookie)).status, 401);
+});
+
+test('email verification invalidates the old session durably across restart', async t => {
+  const { request, messages, restart } = await fixture(t);
+  const account = await request('/register', { username: 'session_player', password: '12345678', email: 'session@example.test' });
+  const verified = await request('/email/verify', { code: messages[0].code }, account.cookie);
+  assert.equal(verified.status, 200);
+  await restart();
+  assert.equal((await request('/account', undefined, account.cookie)).status, 401);
+  assert.equal((await request('/account', undefined, verified.cookie)).status, 200);
+});
+
+test('session write failures cannot acknowledge login or logout and preserve the previous session', async t => {
+  const { request, verified, directory, restart } = await fixture(t);
+  const account = await verified(), rename = fs.renameSync;
+  fs.renameSync = function(from, to) { if (to === path.join(directory, 'sessions.json')) throw new Error('disk full'); return rename.apply(this, arguments); };
+  try {
+    assert.equal((await request('/login', { username: 'player_a', password: 'long password 123' })).status, 500);
+    assert.equal((await request('/logout', {}, account.cookie)).status, 500);
+  } finally { fs.renameSync = rename; }
+  assert.equal((await request('/account', undefined, account.cookie)).status, 200);
+  await restart();
+  assert.equal((await request('/account', undefined, account.cookie)).status, 200);
+});
+
+test('a failed new session write cannot revive the pre-verification session after restart', async t => {
+  const { request, directory, messages, restart } = await fixture(t);
+  const registered = await request('/register', { username: 'version_player', password: '12345678', email: 'version@example.test' });
+  const rename = fs.renameSync;
+  fs.renameSync = function(from, to) { if (to === path.join(directory, 'sessions.json')) throw new Error('disk full'); return rename.apply(this, arguments); };
+  try { assert.equal((await request('/email/verify', { code: messages[0].code }, registered.cookie)).status, 500); }
+  finally { fs.renameSync = rename; }
+  await restart();
+  assert.equal((await request('/account', undefined, registered.cookie)).status, 401);
+  const login = await request('/login', { username: 'version_player', password: '12345678' });
+  assert.equal(login.status, 200); assert.equal(login.body.user.emailVerified, true);
+});
+
 test('registration restores ASCII usernames and keeps 8 to 20 character passwords', async t => {
   const { request } = await fixture(t);
   for (const [username, password, email] of [['player123', '12345678', 'short@example.test'], ['player_2', 'x'.repeat(20), 'long@example.test']]) {
