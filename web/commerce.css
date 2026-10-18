@@ -10,6 +10,9 @@
 .commerce-card .commerce-primary { color: white; background: #315bc4; }
 .commerce-card .commerce-close { width: auto; float: right; margin: 0 0 8px 12px; }
 #commerce-error { color: #ab3434; overflow-wrap: anywhere; }
+#commerce-status, #commerce-delivery-detail { overflow-wrap: anywhere; }
+.commerce-card input[aria-invalid=true] { border-color: #ab3434; }
+.commerce-card #commerce-delivery-help { width: auto; background: transparent; text-decoration: underline; text-underline-offset: 3px; }
 #commerce-error:empty, #commerce-status:empty { display: none; }
 
 .commerce-login-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; margin: 12px 0 8px; border-radius: 12px; background: #f0f4fa; }

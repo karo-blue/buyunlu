@@ -20,7 +20,7 @@
       const result = await response.json();
       if (!response.ok || result.ok === false) {
         if (response.status === 401 && route !== '/login' && session() === token) clear();
-        throw Object.assign(new Error(result.error || '请求失败，请重试'), { status: response.status, retryAfter: result.retryAfter });
+        throw Object.assign(new Error(result.error || '请求失败，请重试'), { status: response.status, code: result.code, retryAfter: result.retryAfter });
       }
       const next = response.headers.get('X-Buyunlu-Session');
       if (next && /^[A-Za-z0-9_-]{43}$/.test(next) && session() === token) host.localStorage.setItem(key, next);

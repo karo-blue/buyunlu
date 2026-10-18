@@ -35,6 +35,14 @@ test('a temporary connection failure preserves the remembered session',async()=>
  await assert.rejects(api.request('/account'));assert.equal(api.hasSession(),true);
 });
 
+test('mail delivery errors retain their safe code and retry guidance at the API boundary', async () => {
+ const host = { localStorage: { getItem: () => '' }, AbortController, setTimeout, clearTimeout,
+  fetch: async () => ({ ok: false, status: 422, json: async () => ({ ok: false, code: 'SMTP_RECIPIENT_INVALID', error: '收件邮箱不存在或地址不正确，请核对后重试。' }) }) };
+ await assert.rejects(createAPI(host, { apiBaseUrl: 'https://backend.example/api' }).request('/email/send', { email: 'missing@example.test' }), cause => {
+  assert.equal(cause.status, 422); assert.equal(cause.code, 'SMTP_RECIPIENT_INVALID'); assert.match(cause.message, /核对/); return true;
+ });
+});
+
 function fixture({store=new Map(),state,failAfterDebit=false,user=true,boards,boardRequest,consumeRequest,slots={1:{name:"旧存档",year:2024,age:30,rankIndex:1}},saveFails=false}={}){
   let balance=10,rewards=0,debits=0,opened=0;let saved;const spent=new Set(),requests=[];
   const host={crypto,localStorage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)},wx:{showToast(){}},

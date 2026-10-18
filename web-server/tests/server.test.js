@@ -398,6 +398,34 @@ test('SMTP failure never claims delivery, creates a session or corrupts an exist
   assert.equal((await request('/email/verify', { code: firstCode }, account.cookie)).status, 200);
 });
 
+test('delivery errors expose only safe actionable messages on registration, resend and code login', async t => {
+  let failure;
+  const f = await fixture(t, { send: () => { if (failure) throw Object.assign(new Error('PRIVATE password 123456'), { code: failure }); } });
+  failure = 'SMTP_RECIPIENT_INVALID';
+  const rejected = await f.request('/register', { username: 'bad_recipient', password: '12345678', email: 'missing@example.test' });
+  assert.equal(rejected.status, 422); assert.equal(rejected.body.code, failure);
+  assert.match(rejected.body.error, /邮箱不存在或地址不正确/); assert.equal(rejected.cookie, null);
+  assert.equal(fs.existsSync(path.join(f.directory, 'accounts.json')), false);
+  failure = null;
+  const account = await f.request('/register', { username: 'player_a', password: '12345678', email: 'player_a@example.test' });
+  const code = f.messages.at(-1).code;
+  f.advance(60000); failure = 'SMTP_MAILBOX_FULL';
+  const resend = await f.request('/email/send', { email: 'full@example.test' }, account.cookie);
+  assert.equal(resend.status, 422); assert.match(resend.body.error, /空间已满/);
+  assert.equal((await f.request('/account', undefined, account.cookie)).body.user.email, 'player_a@example.test');
+  assert.equal((await f.request('/email/verify', { code }, account.cookie)).status, 200);
+  for (const [failureCode, status, message] of [
+    ['SMTP_RECIPIENT_INVALID', 422, /核对/], ['SMTP_RECIPIENT_REJECTED', 422, /拒收/],
+    ['SMTP_TIMEOUT', 503, /超时/], ['SMTP_TEMPORARY', 503, /繁忙/], ['UNTRUSTED', 503, /发送失败/]
+  ]) {
+    f.advance(3600000);
+    failure = failureCode;
+    const result = await f.request('/login/email/send', { email: 'player_a@example.test' });
+    assert.equal(result.status, status); assert.match(result.body.error, message);
+    assert.doesNotMatch(JSON.stringify(result.body), /PRIVATE|password|123456|UNTRUSTED/);
+  }
+});
+
 test('verified email addresses are case insensitive and concurrent registration is reserved', async t => {
   let release; let notify;
   const started = new Promise(resolve => { notify = resolve; });

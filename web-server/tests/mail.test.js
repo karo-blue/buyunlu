@@ -82,7 +82,7 @@ test('STARTTLS is mandatory on other ports and verify does not send mail', async
 test('delivery rejection and SMTP failures never expose provider details or secrets', async () => {
   const input = { email: 'a@example.test', code: '123456', username: 'player_1' };
   const rejected = createMailer({ env, createTransport: () => ({ sendMail: async () => ({ accepted: [], rejected: ['a@example.test'] }), close() {} }) });
-  await assert.rejects(rejected.sendVerificationEmail(input), error => error.code === 'SMTP_FAILED' && !error.message.includes('a@example.test'));
+  await assert.rejects(rejected.sendVerificationEmail(input), error => error.code === 'SMTP_RECIPIENT_REJECTED' && !error.message.includes('a@example.test'));
   const failed = createMailer({ env, createTransport: () => ({ verify: async () => { throw new Error('fake-test-secret 123456'); }, close() {} }) });
   await assert.rejects(failed.verify(), error => error.code === 'SMTP_FAILED' && !error.message.includes('fake-test-secret') && !error.message.includes('123456'));
 });
@@ -115,4 +115,38 @@ test('login email is clearly identified and supports registered legacy Chinese u
  const mailer=createMailer({env,createTransport:()=>({sendMail:async value=>{message=value;return {accepted:[value.to.address]};},close(){}})});
  await mailer.sendVerificationEmail({email:'player@example.test',code:'123456',username:'原有玩家',purpose:'login'});
  assert.match(message.subject,/登录验证码/);assert.match(message.text,/登录验证码/);assert.match(message.text,/123456/);
+});
+
+test('SMTP failures distinguish bad addresses, full mailboxes, refusals and temporary failures without exposing raw replies', async () => {
+  const cases = [
+    [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550, response: '550 5.1.1 No such user PRIVATE' }, 'SMTP_RECIPIENT_INVALID', /邮箱不存在或地址不正确/],
+    [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550, response: '550 5.1.2 Bad destination PRIVATE' }, 'SMTP_RECIPIENT_INVALID', /后缀/],
+    [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550, response: '550 5.2.2 Mailbox full PRIVATE' }, 'SMTP_MAILBOX_FULL', /空间已满/],
+    [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550, response: '550 5.7.1 Policy PRIVATE' }, 'SMTP_RECIPIENT_REJECTED', /拒收/],
+    [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550, response: '550 Unspecified PRIVATE' }, 'SMTP_RECIPIENT_REJECTED', /拒收/],
+    [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 450, response: '450 4.2.0 Busy PRIVATE' }, 'SMTP_TEMPORARY', /繁忙/],
+    [{ code: 'ETIMEDOUT' }, 'SMTP_TIMEOUT', /超时/],
+    [{ code: 'EAUTH', command: 'AUTH PLAIN', responseCode: 535, response: '535 PRIVATE' }, 'SMTP_FAILED', /发送失败/],
+    [{ code: 'EENVELOPE', command: 'MAIL FROM', responseCode: 550, response: '550 5.1.1 Sender PRIVATE' }, 'SMTP_FAILED', /发送失败/]
+  ];
+  for (const [details, code, message] of cases) {
+    const mailer = createMailer({ env, createTransport: () => ({ sendMail: async () => { throw Object.assign(new Error('PRIVATE fake-test-secret 123456'), details); }, close() {} }) });
+    await assert.rejects(mailer.sendVerificationEmail({ email: 'a@example.test', code: '123456', username: 'player_1' }), cause => {
+      assert.equal(cause.code, code); assert.match(cause.message, message);
+      assert.doesNotMatch(cause.message, /PRIVATE|fake-test-secret|123456|a@example/);
+      return true;
+    });
+  }
+});
+
+test('recipient rejection details in a send result are classified and malformed local parts never connect', async () => {
+  const mailer = createMailer({ env, createTransport: () => ({ sendMail: async () => ({ accepted: [], rejected: ['a@example.test'],
+    rejectedErrors: [{ command: 'RCPT TO', responseCode: 550, response: '550 5.1.1 User unknown' }] }), close() {} }) });
+  await assert.rejects(mailer.sendVerificationEmail({ email: 'a@example.test', code: '123456', username: 'player_1' }), cause => cause.code === 'SMTP_RECIPIENT_INVALID');
+  let calls = 0;
+  const invalid = createMailer({ env, createTransport: () => { calls++; throw new Error('must not connect'); } });
+  for (const email of ['.a@example.test', 'a..b@example.test', 'a.@example.test', 'x'.repeat(65) + '@example.test']) {
+    await assert.rejects(invalid.sendVerificationEmail({ email, code: '123456', username: 'player_1' }), cause => cause.code === 'INVALID_EMAIL');
+  }
+  assert.equal(calls, 0);
 });

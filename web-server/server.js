@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { promisify } = require('node:util');
+const { MAIL_ERRORS } = require('./mail');
 const scrypt = promisify(crypto.scrypt);
 const SAVE_KEYS = new Set(['buyunlu_save_v1', 'buyunlu_save_slots_v1', 'buyunlu_local_history_v1', 'buyunlu_h5_pending_v1']);
 const SESSION_AGE = 30 * 24 * 3600 * 1000;
@@ -16,7 +17,7 @@ const publicUser = user => ({ id: user.id, username: user.username, email: user.
 function normalizeEmail(value) {
   const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
   if (email.length > 254 || !/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(email)
-    || email.split('@')[0].length > 64 || email.startsWith('.') || email.includes('..') || email.includes('.@')) throw error(400, '请输入有效的邮箱地址');
+    || email.split('@')[0].length > 64 || email.startsWith('.') || email.includes('..') || email.includes('.@')) throw error(400, '邮箱格式不正确，请填写完整邮箱地址，例如 123456@qq.com，并检查空格和邮箱后缀。');
   return email;
 }
 
@@ -141,7 +142,10 @@ function createServer(options = {}) {
     const challenge = { codeHash: hash((purpose === 'login' ? 'login:' : '') + user.id + ':' + salt + ':' + code), salt, expiresAt: timestamp + VERIFICATION_AGE, sentAt: timestamp, attempts: 0,
       sendWindowStart: sameWindow ? previous.sendWindowStart : timestamp, sendCount: sameWindow ? previous.sendCount + 1 : 1 };
     try { await sendVerificationEmail({ email, code, username: user.username, ...(purpose === 'login' ? { purpose } : {}) }); }
-    catch { throw error(503, '验证邮件暂时发送失败，请稍后重试'); }
+    catch (cause) {
+      const code = Object.hasOwn(MAIL_ERRORS, cause.code) ? cause.code : 'SMTP_FAILED';
+      throw Object.assign(error(MAIL_ERRORS[code].status, MAIL_ERRORS[code].message), { code });
+    }
     return challenge;
   }
   function accountResponse(user) {
@@ -267,7 +271,7 @@ function createServer(options = {}) {
             try { persistAccounts(); } catch (cause) { account.emailLogin = previous; throw cause; }
           });
           // Do not reveal registration state or create an account from a login request.
-          return json(response, 200, { ok: true, retryAfter: 60, message: '若该邮箱已注册并完成验证，登录验证码将发送至邮箱，10分钟内有效。' });
+          return json(response, 200, { ok: true, retryAfter: 60, message: '若该邮箱已注册并完成验证，验证码已提交发送，10分钟内有效。未收到请核对邮箱地址，并检查垃圾邮件。' });
         }
         const invalid = () => error(400, '邮箱或验证码无效、已使用或已过期，请重新发送');
         if (!account) throw invalid();
@@ -381,7 +385,7 @@ function createServer(options = {}) {
       }
       throw error(404, '接口不存在');
     } catch (cause) {
-      if (!response.headersSent) json(response, cause.status || 500, { ok: false, error: cause.status ? cause.message : '服务暂时不可用，请稍后重试', ...(cause.retryAfter ? { retryAfter: cause.retryAfter } : {}) });
+      if (!response.headersSent) json(response, cause.status || 500, { ok: false, error: cause.status ? cause.message : '服务暂时不可用，请稍后重试', ...(Object.hasOwn(MAIL_ERRORS, cause.code) ? { code: cause.code } : {}), ...(cause.retryAfter ? { retryAfter: cause.retryAfter } : {}) });
     }
   });
   server.requestTimeout = 15000;
