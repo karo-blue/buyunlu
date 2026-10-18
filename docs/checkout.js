@@ -2,7 +2,7 @@
   'use strict';
   const byId = id => document.getElementById(id);
   const payButton = byId('pay-button'), checkButton = byId('check-payment'), notice = byId('payment-notice');
-  let status, order, user, busy = false;
+  let status, order, user, busy = false, receiptId = '';
   const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
   const modeAvailable = () => !mobile || status?.modes?.includes('wap');
   const requestKey = 'buyunlu_alipay_request';
@@ -21,21 +21,22 @@
     const paid = order?.state === 'paid', available = status?.enabled && user?.emailVerified && modeAvailable();
     const units = order ? order.quantity : quantity();
     const active = order ? order.state === 'pending' && !!order.payUrl : available && units !== null;
-    amountInput.disabled = busy || !!order || !!status?.testOnly;
+    amountInput.disabled = busy || !!order || !!receiptId || !!status?.testOnly;
     for (const preset of presets) { preset.disabled = amountInput.disabled; preset.setAttribute('aria-pressed', String(Number(preset.dataset.yuan) === units)); }
-    byId('purchase-terms').hidden = !!order;
+    byId('purchase-terms').hidden = !!order || !!receiptId;
     agreement.disabled = busy || !!order;
     byId('amount-error').textContent = !order && units === null ? '请输入 1～100 的整数元金额，每元到账 10 张。' : '';
     amountInput.setAttribute('aria-invalid', String(!order && units === null));
     byId('purchase-cards').textContent = order ? order.cards + ' 张' : units === null ? '—' : units * 10 + ' 张';
     if (!order) byId('order-amount').textContent = byId('order-total').textContent = units === null ? '—' : '¥' + units.toFixed(2);
+    if (receiptId && !order) byId('purchase-cards').textContent = byId('order-total').textContent = '—';
     payButton.hidden = paid || !user?.emailVerified;
     payButton.disabled = busy || !available || !active || (!order && !agreement.checked);
     payButton.textContent = busy ? '正在处理…' : status?.enabled && !modeAvailable() ? '请在电脑端购买' : !available ? status?.testOnly ? '测试购买未开放' : '支付暂不可用' : order ? active ? '继续支付宝付款' : '订单已结束' : units === null ? '请输入整数金额' : !agreement.checked ? '请先确认购买须知' : '支付宝支付 ¥' + units.toFixed(2);
     payButton.setAttribute('aria-busy', String(busy));
-    checkButton.hidden = !order || paid; checkButton.disabled = busy;
+    checkButton.hidden = (!order && !receiptId) || paid; checkButton.disabled = busy;
     checkButton.textContent = busy ? '正在查询…' : '我已支付，查询结果';
-    byId('back-to-game').hidden = !paid;
+    byId('back-to-game').hidden = !paid || !!receiptId;
     byId('new-order').hidden = !available || !order || !['closed', 'expired', 'paid'].includes(order.state);
     byId('new-order').disabled = busy;
     if (!order && status?.enabled && !modeAvailable()) notice.textContent = '手机网站支付尚未开通，请在电脑浏览器打开本页，用手机支付宝扫码付款。';
@@ -52,11 +53,12 @@
     return url.href;
   }
   async function check() {
-    if (busy || !order) return;
+    if (busy || (!order && !receiptId)) return;
     busy = true; byId('payment-error').textContent = ''; render();
     try {
-      const result = await api('/pay/order/' + order.id + '/check', {});
-      order = result.order; byId('card-balance').textContent = result.balance + ' 张';
+      const result = await api(receiptId ? '/pay/receipt' : '/pay/order/' + order.id + '/check', receiptId ? { orderId: receiptId } : {});
+      order = result.order;
+      if (!receiptId) byId('card-balance').textContent = result.balance + ' 张';
       if (order.state === 'paid') sessionStorage.removeItem(requestKey);
     } catch (cause) { byId('payment-error').textContent = cause.message || '暂未确认支付结果，请稍后再试'; }
     finally { busy = false; render(); }
@@ -102,6 +104,19 @@
       try { user = (await api('/account')).user; } catch (cause) { if (cause.status !== 401) throw cause; }
       if (!user?.emailVerified) {
         const orderId = new URLSearchParams(location.search).get('order');
+        if (!user && /^BYL[a-f0-9]{36}$/.test(orderId || '')) {
+          receiptId = orderId;
+          for (const id of ['checkout-back', 'checkout-intro', 'purchase-panel', 'payment-channel']) byId(id).hidden = true;
+          byId('checkout-layout').className = 'checkout-layout receipt-only';
+          byId('payment-login').hidden = true;
+          byId('purchase-account').textContent = '付款前已登录的账号';
+          byId('card-balance').textContent = '请在原浏览器查看';
+          byId('checkout-title').textContent = '确认支付结果';
+          byId('payment-return-help').hidden = false;
+          byId('payment-return-help').textContent = '支付宝可能打开了新的浏览器页面，登录和本机存档不会自动共享。请切回支付前打开步云录的原浏览器或标签页继续游戏，余额会自动更新，无需在此重新登录。';
+          notice.textContent = '正在确认这笔订单，支付结果以服务器确认为准。';
+          await check(); return;
+        }
         byId('payment-login').href = './?checkout=1' + (orderId && /^[A-Za-z0-9]{20,64}$/.test(orderId) ? '&order=' + orderId : '');
         byId('purchase-account').textContent = user ? '请先验证邮箱' : '尚未登录';
         byId('payment-login').hidden = false; byId('payment-login').textContent = user ? '验证邮箱后购买' : '登录或注册后购买'; render(); return;
@@ -116,4 +131,6 @@
       render();
     } catch (cause) { byId('payment-error').textContent = cause.message || '支付服务连接失败，请刷新重试'; payButton.disabled = true; }
   })();
+  window.addEventListener?.('pageshow', event => { if (event.persisted && order?.state !== 'paid') check(); });
+  document.addEventListener?.('visibilitychange', () => { if (!document.hidden && order?.state !== 'paid') check(); });
 })();

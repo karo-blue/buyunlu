@@ -208,6 +208,10 @@ function createServer(options = {}) {
       const user = currentUser(request, response);
       // Nginx must replace X-Real-IP; the service binds only to loopback.
       const ip = String(request.headers['x-real-ip'] || request.socket.remoteAddress);
+      if (route === '/pay/receipt' && request.method === 'POST') {
+        rateLimit('pay-receipt:' + ip, 12, 60000);
+        return json(response, 200, { ok: true, order: await payments.receipt((await bodyOf(request)).orderId) });
+      }
       const publicBoard = route.match(/^\/public\/(leaderboard|tigerboard|escapeboard)$/);
       if (publicBoard && request.method === 'GET') {
         rateLimit('board-read:' + ip, 120, 60000);

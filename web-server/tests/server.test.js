@@ -618,3 +618,11 @@ test('login email IP quota also covers addresses that are not registered',async 
  assert.equal((await f.request('/login/email/send',{email:'other@example.test'})).status,429);
  assert.equal(f.messages.length,0);assert.equal(fs.existsSync(path.join(f.directory,'accounts.json')),false);
 });
+
+test('payment return checks need no browser session but cannot grant account or wallet access',async t=>{
+ const receipt={id:'BYL'+'a'.repeat(36),amount:'1.00',quantity:1,cards:10,state:'paid'};
+ const f=await fixture(t,{payments:{receipt:async id=>{assert.equal(id,receipt.id);return receipt;}}});
+ const response=await f.request('/pay/receipt',{orderId:receipt.id,trade_status:'TRADE_SUCCESS'});
+ assert.equal(response.status,200);assert.deepEqual(response.body,{ok:true,order:receipt});assert.equal(response.cookie,null);
+ assert.equal((await f.request('/account')).status,401);assert.equal((await f.request('/pay/balance')).status,401);
+});

@@ -1,3 +1,7 @@
+(function(start) {
+if (window.BuyunluWebConfig && !window.BuyunluCardAccount) throw new Error('登录组件未能加载，请刷新');
+if (window.BuyunluCardAccount) window.BuyunluCardAccount.access.then(start); else start();
+})(function() {
 (function() {
 'use strict';
 const modules = {"game/core": function(module, exports, require) {
@@ -14887,3 +14891,5 @@ window.addEventListener('pageshow', event => { if (event.persisted && page.onSho
 document.addEventListener('visibilitychange', () => document.hidden ? page.onHide() : page.onShow && page.onShow());
 window.addEventListener('keydown', event => { if (event.key === 'Escape') window.buyunluHandleBack(); if (event.key === 'Tab') BuyunluRuntime.trapFocus(event, document); });
 })();
+
+});

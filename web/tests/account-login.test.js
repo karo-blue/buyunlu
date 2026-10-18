@@ -1,16 +1,19 @@
 
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
-async function fixture({canChange=true,failSend=false,sendError,user={id:'existing',username:'player123',email:'registered@example.test',emailVerified:true}}={}){
+async function fixture({canChange=true,failSend=false,sendError,hasSession=false,accountError,search='',openAfterReady=true,user={id:'existing',username:'player123',email:'registered@example.test',emailVerified:true}}={}){
  const nodes=new Map(),calls=[];
  const byId=id=>{if(!nodes.has(id))nodes.set(id,{value:'',hidden:false,disabled:false,attributes:{},listeners:{},textContent:'',
   setAttribute(k,v){this.attributes[k]=v;},addEventListener(k,fn){this.listeners[k]=fn;},focus(){},reportValidity:()=>true,getClientRects:()=>[{}],querySelectorAll:()=>[]});return nodes.get(id);};
- const host={BuyunluAPI:{hasSession:()=>false,request:async(route,body)=>{calls.push({route,body});if(route.endsWith('/send')){if(sendError)throw sendError;if(failSend)throw new Error('发送失败');return {ok:true,user,retryAfter:60,message:'验证码已提交发送，请检查邮箱'};}return {ok:true,user,retryAfter:60};}}};
- const context={window:host,document:{getElementById:byId,activeElement:null},URLSearchParams,location:{search:'',assign(){}},Date,
+ const session={active:hasSession,user,error:accountError},redirects=[];
+ const host={BuyunluAPI:{hasSession:()=>session.active,request:async(route,body)=>{calls.push({route,body});if(route==='/account'){if(session.error)throw session.error;return {user:session.user};}if(route==='/logout')session.active=false;
+  if(route.endsWith('/send')){if(sendError)throw sendError;if(failSend)throw new Error('发送失败');return {ok:true,user,retryAfter:60,message:'验证码已提交发送，请检查邮箱'};}
+  return {ok:true,user:route.endsWith('/verify')?{...user,emailVerified:true}:user,retryAfter:60};}}};
+ const context={window:host,document:{getElementById:byId,activeElement:null},URLSearchParams,location:{search,assign:url=>redirects.push(url)},Date,
   setInterval:fn=>{const timer=setInterval(fn,1000);timer.unref();return timer;},clearInterval};
  vm.runInNewContext(fs.readFileSync(require.resolve('../commerce-account.js'),'utf8'),context);
- await host.BuyunluCardAccount.ready;host.BuyunluCardAccount.open();host.BuyunluCardAccount.canChange=()=>canChange;
- return {host,nodes,byId,calls,emit:(id,event)=>byId(id).listeners[event]({preventDefault(){}})};
+ await host.BuyunluCardAccount.ready;if(openAfterReady)host.BuyunluCardAccount.open();host.BuyunluCardAccount.canChange=()=>canChange;
+ return {host,nodes,byId,calls,session,redirects,emit:(id,event,detail={})=>byId(id).listeners[event]({preventDefault(){},stopPropagation(){},...detail})};
 }
 test('email code login needs no password, sends a normalized email and preserves the existing identity',async()=>{
  const f=await fixture();await f.emit('commerce-mode-code','click');
@@ -76,4 +79,52 @@ test('a sending request timeout explains uncertainty and does not start a succes
  await f.emit('commerce-login-send', 'click');
  assert.match(f.byId('commerce-error').textContent, /暂未确认验证码是否发出/);
  assert.equal(f.byId('commerce-status').textContent, ''); assert.equal(f.byId('commerce-login-send').disabled, false);
+});
+
+test('opening the website requires login and neither close nor Escape can bypass it', async () => {
+ const f=await fixture({openAfterReady:false});let started=false;
+ assert.equal(typeof f.host.BuyunluCardAccount.access?.then,'function');
+ f.host.BuyunluCardAccount.access.then(()=>{started=true;});
+ assert.equal(f.byId('commerce-account').hidden,false);assert.equal(f.byId('commerce-close').hidden,true);
+ await f.emit('commerce-close','click');await f.emit('commerce-account','keydown',{key:'Escape'});
+ assert.equal(f.byId('commerce-account').hidden,false);assert.equal(f.byId('app').hidden,true);assert.equal(f.byId('app').inert,true);assert.equal(started,false);
+ await f.emit('commerce-login-form','submit');await f.host.BuyunluCardAccount.access;
+ assert.equal(started,true);assert.equal(f.byId('app').hidden,false);assert.equal(f.byId('app').inert,false);
+});
+
+test('a verified persistent session enters directly while an unverified session must verify first', async () => {
+ const f=await fixture({hasSession:true,openAfterReady:false});await f.host.BuyunluCardAccount.access;
+ assert.equal(f.calls.length,1);assert.equal(f.calls[0].route,'/account');assert.equal(f.byId('commerce-account').hidden,true);assert.equal(f.byId('app').hidden,false);
+ const pending=await fixture({hasSession:true,openAfterReady:false,user:{id:'pending',email:'new@example.test',emailVerified:false}});
+ assert.equal(pending.byId('commerce-verify-form').hidden,false);assert.equal(pending.byId('commerce-close').hidden,true);assert.equal(pending.byId('app').hidden,true);
+ pending.byId('commerce-code').value='123456';await pending.emit('commerce-verify-form','submit');await pending.host.BuyunluCardAccount.access;
+ assert.equal(pending.byId('app').hidden,false);assert.equal(pending.byId('commerce-account').hidden,true);
+});
+
+test('failed session recovery keeps the game locked and offers a working retry', async () => {
+ const f=await fixture({hasSession:true,accountError:new TypeError('offline'),openAfterReady:false});
+ assert.equal(f.byId('app').hidden,true);assert.equal(f.byId('commerce-retry').hidden,false);assert.match(f.byId('commerce-error').textContent,/登录状态|网络/);
+ assert.equal(f.session.active,true,'temporary failure must preserve the credential');
+ f.session.error=null;await f.emit('commerce-retry','click');await f.host.BuyunluCardAccount.access;
+ assert.equal(f.calls.filter(c=>c.route==='/account').length,2);assert.equal(f.byId('commerce-account').hidden,true);
+});
+
+test('logout and an expired session relock the game, and signing in unlocks it again', async () => {
+ for(const expired of [false,true]){
+  const f=await fixture({hasSession:true,openAfterReady:false});await f.host.BuyunluCardAccount.access;
+  if(expired){f.session.error=Object.assign(new Error('expired'),{status:401});await f.host.BuyunluCardAccount.restore();}
+  else {f.host.BuyunluCardAccount.open();await f.emit('commerce-logout','click');}
+  assert.equal(f.host.BuyunluCardAccount.user,null);assert.equal(f.byId('app').hidden,true);assert.equal(f.byId('app').inert,true);
+  assert.equal(f.byId('commerce-account').hidden,false);assert.equal(f.byId('commerce-close').hidden,true);
+  await f.emit('commerce-login-form','submit');assert.equal(f.byId('app').hidden,false);assert.equal(f.byId('commerce-account').hidden,true);
+ }
+});
+
+test('login preserves the checkout destination and verified users can close the account panel', async () => {
+ const order='12345678901234567890';
+ const f=await fixture({search:'?checkout=1&order='+order,openAfterReady:false});
+ assert.equal(f.redirects.length,0);await f.emit('commerce-login-form','submit');assert.equal(f.redirects[0],'checkout.html?order='+order);
+ const existing=await fixture({hasSession:true,search:'?account=1',openAfterReady:false});
+ assert.equal(existing.byId('commerce-account').hidden,false);assert.equal(existing.byId('commerce-close').hidden,false);
+ await existing.emit('commerce-account','keydown',{key:'Escape'});assert.equal(existing.byId('commerce-account').hidden,true);
 });

@@ -136,6 +136,15 @@ function createPayments(options) {
       return view(order);
     },
     getOrder: (user, id) => view(owned(user, id)),
+    async receipt(id) {
+      // A 144-bit random order ID permits only this short-lived receipt view.
+      // It never grants an account session, balance access or another payment URL.
+      const order = /^BYL[a-f0-9]{36}$/.test(id || '') && ledger.orders[id];
+      if (!order) throw fail(404, '订单不存在');
+      if (now() >= order.createdAt + 24 * 3600000) throw fail(410, '付款返回页已过期，请回原浏览器查看订单');
+      const result = await this.reconcile({ id: order.userId }, id);
+      return { id: result.id, amount: result.amount, cards: result.cards, quantity: result.quantity, state: result.state };
+    },
     async reconcile(user, id) {
       const order = owned(user, id);
       if (order.state !== 'pending' || !sdk) return view(order);

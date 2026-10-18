@@ -239,11 +239,26 @@ function cardApp(saved = new Map(), options = {}) {
   doc.addEventListener = () => {};
   doc.querySelectorAll = () => [];
   ctx.window = ctx;
+  if (options.access) ctx.BuyunluCardAccount = { access: options.access };
   vm.createContext(ctx);
   if (options.legacyStrings) vm.runInContext('String.prototype.replaceAll = undefined', ctx);
   for (const file of ['runtime.js', 'offline.js', 'game.js']) vm.runInContext(fs.readFileSync(path.join(result.output, file), 'utf8'), ctx);
   return { page: ctx.buyunluPage, ctx, root, saved, blockWrites(value) { blocked = value; } };
 }
+
+test('the published game does not initialize or touch saves before verified login', async () => {
+ let allow;
+ const access=new Promise(resolve=>{allow=resolve;});
+ const saved=new Map([['buyunlu_save_v1','existing save']]);
+ const app=cardApp(saved,{access});
+ assert.equal(app.ctx.buyunluPage,undefined);assert.equal(app.root.childNodes.length,0);assert.equal(saved.size,1);
+ assert.equal(saved.get('buyunlu_save_v1'),'existing save');
+ allow();await access;
+ assert.ok(app.ctx.buyunluPage);assert.ok(app.root.childNodes.length>0);
+ const html=fs.readFileSync(path.join(__dirname,'../../docs/index.html'),'utf8');
+ assert.match(html,/<main hidden inert id="app"/);
+ assert.doesNotMatch(html,/<section id="commerce-account"[^>]* hidden/);
+});
 
 test('ad-card entry buys presets and custom cards free, without payment, game cash or duplicate confirmations', () => {
   const app = cardApp();

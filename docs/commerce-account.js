@@ -3,19 +3,33 @@
   const byId = id => document.getElementById(id), api = window.BuyunluAPI.request;
   const screen = byId('commerce-account');
   let registering = false, busy = false, afterLogin = false, retryAt = 0, opener, verificationEmail = '', loginRetryAt = 0, loginTimer;
-  const controller = window.BuyunluCardAccount = { user: null, onChange() {}, open, checkout, restore, ready: null };
+  let allowGame;
+  const controller = window.BuyunluCardAccount = { user: null, onChange() {}, open, checkout, restore, ready: null,
+    access: new Promise(resolve => { allowGame = resolve; }) };
   let restoring;
+  function setUser(user) {
+    const previous = controller.user;
+    controller.user = user;
+    const verified = !!user?.emailVerified;
+    byId('app').hidden = !verified;
+    byId('app').inert = !verified || !screen.hidden;
+    byId('commerce-close').hidden = !verified;
+    byId('commerce-current').hidden = byId('commerce-logout').hidden = !user;
+    byId('commerce-current').textContent = user ? '当前账号：' + user.username : '';
+    if (verified) allowGame();
+    else if (screen.hidden) open(afterLogin);
+    if (previous?.id !== user?.id || previous?.emailVerified !== user?.emailVerified) controller.onChange();
+  }
   function restore() {
     if (restoring) return restoring;
     restoring = (async () => {
-      const previous = controller.user;
       let user = null;
       if (window.BuyunluAPI.hasSession()) {
         try { user = (await api('/account')).user; }
         catch (cause) { if (cause.status !== 401) throw cause; }
       }
-      controller.user = user;
-      if (previous?.id !== user?.id || previous?.emailVerified !== user?.emailVerified) controller.onChange();
+      setUser(user);
+      if (user && !user.emailVerified) showVerify({ user }, false);
       return user;
     })().finally(() => { restoring = null; });
     return restoring;
@@ -59,22 +73,22 @@
   function lock(value) { busy = value; screen.setAttribute('aria-busy', String(value)); for (const button of screen.querySelectorAll('button')) button.disabled = value;
     renderLoginSend();
     if(value)byId('commerce-status').textContent='正在处理，请稍候…';else if(byId('commerce-status').textContent==='正在处理，请稍候…')byId('commerce-status').textContent=''; }
-  function close() { if (busy) return; clearInterval(loginTimer); screen.hidden = true; byId('app').inert = false; opener?.focus?.(); }
+  function close() { if (busy || !controller.user?.emailVerified) return; clearInterval(loginTimer); screen.hidden = true; byId('app').inert = false; opener?.focus?.(); }
   function returnToCheckout() {
     const id = new URLSearchParams(location.search).get('order');
     location.assign('checkout.html' + (id && /^[A-Za-z0-9]{20,64}$/.test(id) ? '?order=' + id : ''));
   }
   function finish(user) {
-    controller.user = user;
-    controller.onChange();
+    setUser(user);
     if (afterLogin || new URLSearchParams(location.search).get('checkout') === '1') returnToCheckout();
     else { lock(false); close(); }
   }
   function showVerify(result, sent) {
     const user = result.user;
+    setUser(user);
     byId('commerce-login-modes').hidden = true; byId('commerce-code-login-form').hidden = true;
     byId('commerce-login-form').hidden = true; byId('commerce-verify-form').hidden = false;
-    byId('commerce-title').textContent = '验证购卡账号邮箱';
+    byId('commerce-title').textContent = '验证账号邮箱';
     byId('commerce-verify-email').value = user.email || ''; byId('commerce-code').value = '';
     verificationEmail = (user.email || '').trim().toLowerCase();
     retryAt = Date.now() + (result.retryAfter || 0) * 1000;
@@ -84,11 +98,13 @@
   function open(wantsCheckout = false) {
     afterLogin = wantsCheckout; opener = document.activeElement;
     screen.hidden = false; byId('app').inert = true;
+    byId('app').hidden = byId('commerce-close').hidden = !controller.user?.emailVerified;
+    byId('commerce-retry').hidden = true;
     byId('commerce-error').textContent = ''; byId('commerce-status').textContent = '';
     byId('commerce-delivery-help').hidden = true; byId('commerce-delivery-detail').hidden = true;
     setLoginMode('password');
     byId('commerce-current').hidden = byId('commerce-logout').hidden = !controller.user;
-    byId('commerce-current').textContent = controller.user ? '当前购卡账号：' + controller.user.username : '';
+    byId('commerce-current').textContent = controller.user ? '当前账号：' + controller.user.username : '';
     byId('commerce-username').focus();
   }
   async function checkout() {
@@ -103,7 +119,7 @@
     byId('commerce-error').textContent = ''; byId('commerce-status').textContent = '';
     byId('commerce-delivery-help').hidden = true; byId('commerce-delivery-detail').hidden = true;
     byId('commerce-login-modes').hidden = registering;
-    byId('commerce-title').textContent = registering ? '注册购卡账号' : '登录购卡账号';
+    byId('commerce-title').textContent = registering ? '注册步云录账号' : '登录步云录';
     byId('commerce-identifier-label').textContent = registering ? '用户名' : '用户名或邮箱';
     byId('commerce-identifier-help').textContent = registering ? '3～24 位英文字母、数字或下划线' : '可使用用户名或已验证邮箱登录';
     byId('commerce-username').pattern = registering ? '[A-Za-z0-9_]{3,24}' : '.*';
@@ -136,7 +152,7 @@
     byId('commerce-code-login-form').hidden = !code;
     byId('commerce-mode-password').setAttribute('aria-pressed', String(!code));
     byId('commerce-mode-code').setAttribute('aria-pressed', String(code));
-    byId('commerce-title').textContent = code ? '邮箱验证码登录' : '登录购卡账号';
+    byId('commerce-title').textContent = code ? '邮箱验证码登录' : '登录步云录';
     byId('commerce-error').textContent = ''; byId('commerce-status').textContent = '';
     byId('commerce-password').value = '';
     startLoginCountdown();
@@ -202,7 +218,7 @@
     if(busy) return;
     if(controller.canChange?.()===false)return error(new Error('上次用卡结果未确认，请先重试用卡'));
     lock(true);
-    try { await api('/logout',{}); controller.user=null; controller.onChange(); byId('commerce-current').hidden=byId('commerce-logout').hidden=true; }
+    try { await api('/logout',{}); lock(false); setUser(null); open(); }
     catch(cause) { error(cause); } finally { lock(false); }
   });
   screen.addEventListener('keydown', event => {
@@ -214,8 +230,22 @@
       else if(!event.shiftKey&&document.activeElement===controls[controls.length-1]){event.preventDefault();controls[0].focus();}
     }
   });
-  controller.ready = restore().catch(()=>{}).then(()=>{
-    const query=new URLSearchParams(location.search);
-    if(query.get('checkout')==='1') checkout(); else if(query.get('account')==='1') open();
-  });
+  async function initialize() {
+    if (busy) return;
+    const query = new URLSearchParams(location.search);
+    open(query.get('checkout') === '1'); lock(true);
+    byId('commerce-status').textContent = '正在确认登录状态，请稍候…';
+    try {
+      const user = await restore(); lock(false);
+      byId('commerce-status').textContent = '';
+      if (user?.emailVerified) {
+        if (afterLogin) returnToCheckout(); else if (query.get('account') !== '1') close();
+      } else if (user) showVerify({ user }, false);
+    } catch {
+      lock(false); error(new Error('暂时无法确认登录状态，请检查网络后重试。'));
+      byId('commerce-retry').hidden = false;
+    }
+  }
+  byId('commerce-retry').addEventListener('click', () => controller.ready = initialize());
+  controller.ready = initialize();
 })();

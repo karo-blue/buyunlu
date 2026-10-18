@@ -173,3 +173,22 @@ test('a changed account cannot create an order or debit against the displayed ac
  assert.equal(payments.balance(user),10);
  assert.throws(()=>payments.createOrder(user,{accountId:'stale-account',requestId:requestId(),quantity:1,mode:'wap'}),/账号/);
 });
+
+test('a recent opaque order return can confirm payment without exposing an account or creating a login',async t=>{
+ const {payments}=fixture(t,{queryTrade:async id=>({out_trade_no:id,total_amount:'1.00',trade_status:'TRADE_SUCCESS',trade_no:'receipt-trade-1'})});
+ const order=payments.createOrder(user,{requestId:requestId(),quantity:1,mode:'wap'});
+ const receipt=await payments.receipt(order.id);
+ assert.deepEqual(Object.keys(receipt).sort(),['amount','cards','id','quantity','state']);assert.equal(receipt.state,'paid');assert.equal(receipt.cards,10);
+ await payments.receipt(order.id);assert.equal(payments.balance(user),10,'repeated checks do not issue more cards');
+ await assert.rejects(payments.receipt('BYL'+'0'.repeat(36)),/不存在/);
+ await assert.rejects(payments.receipt('__proto__'),/不存在/);
+});
+
+test('receipt access expires after one day and server query failures never claim successful payment',async t=>{
+ let now=Date.now();
+ const {payments}=fixture(t,{now:()=>now,queryTrade:async()=>{throw new Error('offline');}});
+ const order=payments.createOrder(user,{requestId:requestId(),quantity:1,mode:'wap'});
+ await assert.rejects(payments.receipt(order.id),/暂未确认/);assert.equal(payments.balance(user),0);
+ now+=24*3600*1000;
+ await assert.rejects(payments.receipt(order.id),/已过期/);
+});
