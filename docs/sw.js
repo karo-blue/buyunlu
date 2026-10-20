@@ -1,5 +1,5 @@
 'use strict';
-const VERSION = '1.0.20';
+const VERSION = '1.0.21';
 const SCOPE = self.registration.scope;
 const CACHE_PREFIX = 'buyunlu-web:' + SCOPE + ':';
 const CACHE_NAME = CACHE_PREFIX + VERSION;
