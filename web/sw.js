@@ -6,7 +6,7 @@ const CACHE_NAME = CACHE_PREFIX + VERSION;
 const scoped = name => new URL(name, SCOPE).href;
 const INDEX = scoped('index.html?v=' + VERSION);
 const PRECACHE = [
-  'index.html?v=' + VERSION, 'style.css?v=' + VERSION,
+  'index.html?v=' + VERSION, 'theme.css?v=' + VERSION, 'style.css?v=' + VERSION,
   'runtime.js?v=' + VERSION, 'offline.js?v=' + VERSION, 'game.js?v=' + VERSION,
   'site.js?v=' + VERSION, 'commerce-api.js?v=' + VERSION,
   'commerce-account.js?v=' + VERSION, 'commerce.js?v=' + VERSION, 'commerce.css?v=' + VERSION,

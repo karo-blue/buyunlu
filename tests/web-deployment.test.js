@@ -8,6 +8,17 @@ const { once } = require('node:events');
 const { createServer } = require('../web/serve');
 const root = path.join(__dirname, '..');
 
+test('game, account gate and purchase pages share the offline available theme', () => {
+  const version = require('../package.json').version;
+  for (const page of ['index.html', 'checkout.html', 'product.html']) {
+    const html = fs.readFileSync(path.join(root, 'docs', page), 'utf8');
+    assert.ok(html.includes(`href="theme.css?v=${version}"`), page);
+    assert.ok(html.indexOf('href="theme.css') < html.indexOf(page === 'index.html' ? 'href="style.css' : 'href="store.css'), page);
+  }
+  const sw = fs.readFileSync(path.join(root, 'docs/sw.js'), 'utf8');
+  assert.ok(sw.includes("'theme.css?v=' + VERSION"));
+});
+
 test('committed web distribution rebuilds exactly from the public source', () => {
   const { build } = require('../web/build');
   const output = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'buyunlu-web-'));
