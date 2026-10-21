@@ -416,7 +416,7 @@ test('delivery errors expose only safe actionable messages on registration, rese
   assert.equal((await f.request('/email/verify', { code }, account.cookie)).status, 200);
   for (const [failureCode, status, message] of [
     ['SMTP_RECIPIENT_INVALID', 422, /核对/], ['SMTP_RECIPIENT_REJECTED', 422, /拒收/],
-    ['SMTP_TIMEOUT', 503, /超时/], ['SMTP_TEMPORARY', 503, /繁忙/], ['UNTRUSTED', 503, /发送失败/]
+    ['SMTP_TIMEOUT', 503, /超时/], ['SMTP_TEMPORARY', 503, /繁忙/], ['SMTP_SENDER_QUOTA', 503, /发信服务.*额度/], ['UNTRUSTED', 503, /发送失败/]
   ]) {
     f.advance(3600000);
     failure = failureCode;

@@ -2,6 +2,7 @@
 const net = require('node:net');
 
 const MAIL_ERRORS = Object.freeze({
+  SMTP_SENDER_QUOTA: { status: 503, message: '验证码发信服务额度已用尽，请等待服务恢复后再试。' },
   SMTP_RECIPIENT_INVALID: { status: 422, message: '收件邮箱不存在或地址不正确，请核对邮箱账号和后缀后重新发送。' },
   SMTP_RECIPIENT_REJECTED: { status: 422, message: '收件邮箱拒收验证码，请检查邮箱收信设置，或更换可正常收信的邮箱。' },
   SMTP_MAILBOX_FULL: { status: 422, message: '收件邮箱空间已满，请清理邮箱后重新发送，或更换邮箱。' },
@@ -23,6 +24,7 @@ function validEmail(value) {
 function smtpFailure(cause) {
   if (Object.hasOwn(MAIL_ERRORS, cause.code)) return mailError(cause.code);
   if (cause.code === 'ETIMEDOUT') return mailError('SMTP_TIMEOUT');
+  if (/^\s*(?:550|554)[ -]+MI:STC(?:\s|$)/i.test(String(cause.response || ''))) return mailError('SMTP_SENDER_QUOTA');
   const recipient = cause.command === 'RCPT TO' || cause.rejected?.length > 0;
   const status = String(cause.response || '').match(/\b[45]\.\d{1,3}\.\d{1,3}\b/)?.[0];
   if (recipient && /^5\.1\.[1236]$/.test(status)) return mailError('SMTP_RECIPIENT_INVALID');

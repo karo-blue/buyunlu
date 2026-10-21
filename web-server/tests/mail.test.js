@@ -127,6 +127,8 @@ test('SMTP failures distinguish bad addresses, full mailboxes, refusals and temp
     [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550, response: '550 5.2.2 Mailbox full PRIVATE' }, 'SMTP_MAILBOX_FULL', /空间已满/],
     [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550, response: '550 5.7.1 Policy PRIVATE' }, 'SMTP_RECIPIENT_REJECTED', /拒收/],
     [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 550, response: '550 Unspecified PRIVATE' }, 'SMTP_RECIPIENT_REJECTED', /拒收/],
+    [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 554, response: '554 MI:STC 126 PRIVATE' }, 'SMTP_SENDER_QUOTA', /发信服务.*额度/],
+    [{ code: 'EENVELOPE', command: 'MAIL FROM', responseCode: 550, response: '550 MI:STC PRIVATE' }, 'SMTP_SENDER_QUOTA', /发信服务.*额度/],
     [{ code: 'EENVELOPE', command: 'RCPT TO', responseCode: 450, response: '450 4.2.0 Busy PRIVATE' }, 'SMTP_TEMPORARY', /繁忙/],
     [{ code: 'ETIMEDOUT' }, 'SMTP_TIMEOUT', /超时/],
     [{ code: 'EAUTH', command: 'AUTH PLAIN', responseCode: 535, response: '535 PRIVATE' }, 'SMTP_FAILED', /发送失败/],
@@ -152,4 +154,20 @@ test('recipient rejection details in a send result are classified and malformed 
     await assert.rejects(invalid.sendVerificationEmail({ email, code: '123456', username: 'player_1' }), cause => cause.code === 'INVALID_EMAIL');
   }
   assert.equal(calls, 0);
+});
+
+
+test('Tencent SMTP configuration preserves TLS and the verified sender with simulated delivery', async () => {
+  const sender = 'verify@notify.example.test';
+  let config, message;
+  const mailer = createMailer({ env: { ...env, H5_SMTP_HOST: 'gz-smtp.qcloudmail.com', H5_SMTP_USER: sender, H5_SMTP_FROM: sender },
+    createTransport: value => { config = value; return { sendMail: async value => { message = value; return { accepted: [value.to.address] }; }, close() {} }; } });
+  await mailer.sendVerificationEmail({ email: 'player@example.test', code: '123456', username: 'player_1' });
+  assert.equal(config.host, 'gz-smtp.qcloudmail.com');
+  assert.equal(config.secure, true);
+  assert.equal(config.tls.rejectUnauthorized, true);
+  assert.equal(config.tls.servername, 'gz-smtp.qcloudmail.com');
+  assert.equal(config.auth.user, sender);
+  assert.deepEqual(message.from, { name: '步步有为', address: sender });
+  assert.deepEqual(message.envelope, { from: sender, to: ['player@example.test'] });
 });
