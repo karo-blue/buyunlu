@@ -145,7 +145,7 @@ const totalAll = burstCount + reviewCards.length + investigationCount + commonEv
 const html = `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>步云录 · 随机事件总览（${totalAll} 条）</title>
+<title>步步有为 · 随机事件总览（${totalAll} 条）</title>
 <style>
 :root{--bg:#f6f5f2;--card:#fff;--ink:#1d1c1a;--dim:#6b6862;--line:#e3e0d9;--best:#b3261e;--bad:#2f6b3a;--gold:#9a6b1f}
 *{box-sizing:border-box}
@@ -187,7 +187,7 @@ ol.titles{margin:0;padding-left:22px;columns:2;column-gap:32px}
 ol.titles li{font-size:13px;color:var(--dim);margin:2px 0}
 @media(max-width:640px){header,nav,main{padding-left:16px;padding-right:16px}nav{position:static}ol.titles{columns:1}}
 </style></head><body>
-<header><h1>步云录 · 随机事件总览</h1>
+<header><h1>步步有为 · 随机事件总览</h1>
 <p>共 ${totalAll} 条。覆盖突发、倒查、监督核查、通用主事件、岗位主事件与职级题库（题库只列题名，完整内容用 tools/preview-rank-events.js 生成的预览页看）。</p></header>
 <nav>
 <a href="#burst">突发事件<em>${burstCount}</em></a>

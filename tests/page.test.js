@@ -763,7 +763,7 @@ test('问责、作风处分和落马结局对齐参考页，并允许立即再�
   assert.doesNotMatch(page.data.dialog.content, /被带走调查/);
 
   page.dialogConfirm();
-  assert.equal(page.data.dialog.title, '步云录 · 人生排行榜');
+  assert.equal(page.data.dialog.title, '步步有为 · 人生排行榜');
   assert.equal(page.data.dialog.confirmText, '再试一次');
   assert.equal(page.data.dialog.cancelText, '关闭');
   page.dialogConfirm();

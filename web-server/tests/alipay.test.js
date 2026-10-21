@@ -68,6 +68,7 @@ test('payment callbacks stay within the configured subdirectory', t => {
   const order = payments.createOrder(user, { requestId: requestId(), quantity: 6, mode: 'wap' });
   const url = new URL(order.payUrl);
   assert.equal(url.searchParams.get('notify_url'), 'https://example.invalid/buyunlu/api/pay/alipay/notify');
+  assert.equal(JSON.parse(url.searchParams.get('biz_content')).subject, '步步有为概率卡 · 60张');
   assert.equal(url.searchParams.get('return_url'), 'https://example.invalid/buyunlu/checkout.html?order=' + order.id);
   assert.equal(JSON.parse(url.searchParams.get('biz_content')).quit_url, url.searchParams.get('return_url'));
 });

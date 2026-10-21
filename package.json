@@ -7,7 +7,7 @@
     "start": "node web/serve.js",
     "test:web": "node --test --test-concurrency=1 tests/web-deployment.test.js web/tests/*.test.js"
   },
-  "version": "1.0.21",
-  "description": "步云录网页即用版与微信小程序公开源码，仅限非商业使用",
+  "version": "1.0.22",
+  "description": "步步有为网页即用版与微信小程序公开源码，仅限非商业使用",
   "license": "SEE LICENSE IN LICENSE"
 }

@@ -5,7 +5,7 @@ const leaderboard = require('../services/leaderboard');
 const server = require('../server/app');
 const { candidate } = require('./helpers/leader-fixture');
 
-test('人民公仆在步云录中按清正条件自动形成荣誉称呼', () => {
+test('人民公仆在步步有为中按清正条件自动形成荣誉称呼', () => {
   const state = core.newState();
   Object.assign(state, {
     rankIndex: core.RANKS.length,

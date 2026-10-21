@@ -353,14 +353,14 @@ Page({
     }
     const state = core.normalizeState(this.data.state);
     const rank = core.RANKS[state.rankIndex - 1] || core.RANKS[0];
-    const title = state.ended ? `《步云录》结局：${state.name || '匿名玩家'} · ${rank.short}` : `《步云录》：${state.name || '匿名玩家'}的仕途成长记录`;
+    const title = state.ended ? `《步步有为》结局：${state.name || '匿名玩家'} · ${rank.short}` : `《步步有为》：${state.name || '匿名玩家'}的仕途成长记录`;
     return { title, path: '/pages/index/index?from=share' };
   },
 
   onShareTimeline() {
     const state = core.normalizeState(this.data.state);
     const rank = core.RANKS[state.rankIndex - 1] || core.RANKS[0];
-    return { title: `《步云录》${state.name || '匿名玩家'} · ${rank.short}`, query: 'from=timeline' };
+    return { title: `《步步有为》${state.name || '匿名玩家'} · ${rank.short}`, query: 'from=timeline' };
   },
 
   buildPatch(stateOverride) {
@@ -983,7 +983,7 @@ Page({
   // 编一条假的就是造谣）。离线时最多显示本机自己的落马记录。
   showTigerBoard() {
     const result = leaderboard.getTigerRanking(this.data.state);
-    const title = '步云录 · 老虎榜';
+    const title = '步步有为 · 老虎榜';
     const localRows = leaderboard.tigerRows(result);
     const configured = leaderboardApi.isConfigured();
     this.showModal({ title, rows: configured ? localRows.concat([BOARD_LOADING_ROW]) : localRows, content: '', showCancel: false });
@@ -1284,7 +1284,7 @@ Page({
   restart() { this.showModal({ title: '确认重新开局', content: '重新开局会清空当前本地档案，并从22岁二级科员重新开始。', confirmText: '确认清空', cancelText: '取消', success: (res) => { if (res.confirm) this.startFreshGame(); } }); },
   showLeaderboard() {
     const result = leaderboard.getPlayerRanking(this.data.state);
-    const title = '步云录 · 人生排行榜';
+    const title = '步步有为 · 人生排行榜';
     const ending = !!this.data.state.ended;
     const showRows = rows => this.showModal({
       title,
@@ -1333,7 +1333,7 @@ Page({
     const honorLine = honor.awarded ? `\n同志们这样称呼你：${honor.title}（${honor.year}年）——你办过的事，老百姓记得。` : '';
     this.showModal({
       title: `人生结局：${state.ending}`,
-      content: `${endingLead}\n${state.name ? '主角：' + state.name + '\n' : ''}最终官阶：${core.RANKS[state.rankIndex - 1].name}　具体职事：${state.currentPosition}${honorLine}\n家庭状态：${state.relationship}，子女 ${state.children}人\n退休净财产：${money(state.retirementWealth || core.netWealth(state))}\n${rankText}\n\n感谢体验《步云录》。这是一个虚构的成长模拟故事。`,
+      content: `${endingLead}\n${state.name ? '主角：' + state.name + '\n' : ''}最终官阶：${core.RANKS[state.rankIndex - 1].name}　具体职事：${state.currentPosition}${honorLine}\n家庭状态：${state.relationship}，子女 ${state.children}人\n退休净财产：${money(state.retirementWealth || core.netWealth(state))}\n${rankText}\n\n感谢体验《步步有为》。这是一个虚构的成长模拟故事。`,
       confirmText: '查看排行榜',
       cancelText: '再试一次',
       success: res => { if (res.confirm) this.showLeaderboard(); else if (res.cancel) this.startFreshGame(); },
@@ -1414,7 +1414,7 @@ Page({
     // 关系网入口已经下线，落马页不再统计"同船几人、帮扶几人、带走几人"——
     // 上面"谁开的口 + 那几件事"已经把该说的说完了，再挂一行人数只会让人以为还有个没做完的页面。
     lines.push('', rankText);
-    lines.push('', '感谢体验《步云录》。这是一个虚构的成长模拟故事。');
+    lines.push('', '感谢体验《步步有为》。这是一个虚构的成长模拟故事。');
     this.showModal({
       tone: 'danger',
       title: isConductEnding ? '人生结局：作风处分' : `人生结局：落马｜${state.ending}`,

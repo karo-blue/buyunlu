@@ -119,7 +119,7 @@
     byId('commerce-error').textContent = ''; byId('commerce-status').textContent = '';
     byId('commerce-delivery-help').hidden = true; byId('commerce-delivery-detail').hidden = true;
     byId('commerce-login-modes').hidden = registering;
-    byId('commerce-title').textContent = registering ? '注册步云录账号' : '登录步云录';
+    byId('commerce-title').textContent = registering ? '注册步步有为账号' : '登录步步有为';
     byId('commerce-identifier-label').textContent = registering ? '用户名' : '用户名或邮箱';
     byId('commerce-identifier-help').textContent = registering ? '3～24 位英文字母、数字或下划线' : '可使用用户名或已验证邮箱登录';
     byId('commerce-username').pattern = registering ? '[A-Za-z0-9_]{3,24}' : '.*';
@@ -152,7 +152,7 @@
     byId('commerce-code-login-form').hidden = !code;
     byId('commerce-mode-password').setAttribute('aria-pressed', String(!code));
     byId('commerce-mode-code').setAttribute('aria-pressed', String(code));
-    byId('commerce-title').textContent = code ? '邮箱验证码登录' : '登录步云录';
+    byId('commerce-title').textContent = code ? '邮箱验证码登录' : '登录步步有为';
     byId('commerce-error').textContent = ''; byId('commerce-status').textContent = '';
     byId('commerce-password').value = '';
     startLoginCountdown();

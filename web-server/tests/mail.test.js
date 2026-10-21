@@ -25,7 +25,10 @@ test('verification email uses one recipient, verified TLS and no debug logging',
   assert.equal(config.disableFileAccess, true);
   assert.equal(config.disableUrlAccess, true);
   assert.deepEqual(message.to, { address: 'player@example.test' });
-  assert.deepEqual(message.from, { name: '步云录', address: 'sender@example.test' });
+  assert.deepEqual(message.from, { name: '步步有为', address: 'sender@example.test' });
+  assert.equal(message.subject, '步步有为邮箱验证码');
+  assert.match(message.text, /你的步步有为邮箱验证码/);
+  assert.doesNotMatch(message.text, /步云录/);
   assert.match(message.text, /123456/);
   assert.match(message.text, /player_1/);
   assert.equal(message.html, undefined);

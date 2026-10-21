@@ -36,5 +36,5 @@ module.exports = { createServer };
 if (require.main === module) {
   const port = Number(process.env.PORT || 8080);
   const host = process.env.HOST || '0.0.0.0';
-  createServer().listen(port, host, () => console.log(`步云录网页版已启动：http://localhost:${port}`));
+  createServer().listen(port, host, () => console.log(`步步有为网页版已启动：http://localhost:${port}`));
 }

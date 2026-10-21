@@ -113,7 +113,7 @@
           byId('card-balance').textContent = '请在原浏览器查看';
           byId('checkout-title').textContent = '确认支付结果';
           byId('payment-return-help').hidden = false;
-          byId('payment-return-help').textContent = '支付宝可能打开了新的浏览器页面，登录和本机存档不会自动共享。请切回支付前打开步云录的原浏览器或标签页继续游戏，余额会自动更新，无需在此重新登录。';
+          byId('payment-return-help').textContent = '支付宝可能打开了新的浏览器页面，登录和本机存档不会自动共享。请切回支付前打开步步有为的原浏览器或标签页继续游戏，余额会自动更新，无需在此重新登录。';
           notice.textContent = '正在确认这笔订单，支付结果以服务器确认为准。';
           await check(); return;
         }

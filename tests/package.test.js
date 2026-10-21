@@ -199,7 +199,7 @@ test('release build does not present copyrighted character presets', () => {
 
 test('release metadata consistently uses the Buyunlu title', () => {
   const metadata = `${read('app.json')}\n${read('project.config.json')}\n${read('sitemap.json')}\n${read('README.md')}`;
-  assert.match(metadata, /步云录/);
+  assert.match(metadata, /步步有为/);
   assert.doesNotMatch(metadata, /重生之我是公务员的一生|重生公务员-反编译/);
 });
 

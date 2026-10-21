@@ -80,7 +80,7 @@ function createPayments(options) {
     const time = new Date(order.expiresAt + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
     return sdk.pageExecute(order.mode === 'wap' ? 'alipay.trade.wap.pay' : 'alipay.trade.page.pay', 'GET', {
       notifyUrl: origin + basePath + 'api/pay/alipay/notify', returnUrl: frontend.href + 'checkout.html?order=' + order.id,
-      bizContent: { out_trade_no: order.id, total_amount: money(order.amountFen), subject: '步云录概率卡 · ' + order.cards + '张',
+      bizContent: { out_trade_no: order.id, total_amount: money(order.amountFen), subject: '步步有为概率卡 · ' + order.cards + '张',
         product_code: order.mode === 'wap' ? 'QUICK_WAP_WAY' : 'FAST_INSTANT_TRADE_PAY', seller_id: config.sellerId,
         time_expire: time, ...(order.mode === 'wap' ? { quit_url: frontend.href + 'checkout.html?order=' + order.id } : {}) }
     });

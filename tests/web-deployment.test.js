@@ -8,6 +8,19 @@ const { once } = require('node:events');
 const { createServer } = require('../web/serve');
 const root = path.join(__dirname, '..');
 
+test('published game consistently uses the new name and keeps existing app identity', () => {
+  for (const name of ['index.html', 'product.html', 'checkout.html', 'commerce-account.js', 'commerce.js', 'checkout.js', 'game.js', 'template.json', 'manifest.webmanifest', '使用说明.txt']) {
+    const text = fs.readFileSync(path.join(root, 'docs', name), 'utf8');
+    assert.ok(text.includes('步步有为'), name);
+    assert.ok(!text.includes('步云录'), name);
+  }
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'docs/manifest.webmanifest'), 'utf8'));
+  assert.equal(manifest.short_name, '步步有为');
+  assert.equal(manifest.id, './');
+  assert.equal(manifest.scope, './');
+  assert.equal(require('../web/site.json').apiBaseUrl, 'https://xiaoma51.com/buyunlu/api');
+});
+
 test('game, account gate and purchase pages share the offline available theme', () => {
   const version = require('../package.json').version;
   for (const page of ['index.html', 'checkout.html', 'product.html']) {
@@ -50,7 +63,7 @@ test('standalone web server serves the game, supports HEAD and rejects traversal
     const response = await fetch(base);
     assert.equal(response.status, 200);
     assert.match(response.headers.get('content-type'), /text\/html/);
-    assert.match(await response.text(), /步云录/);
+    assert.match(await response.text(), /步步有为/);
     assert.equal((await fetch(`${base}/game.js`)).status, 200);
     const manifest = await fetch(`${base}/manifest.webmanifest`);
     assert.equal(manifest.status, 200);

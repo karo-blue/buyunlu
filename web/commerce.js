@@ -8,8 +8,8 @@
     if(boards){
       let boardRequest=0;
       for(const [method,path,title,format] of [
-        ['showLeaderboard','leaderboard','步云录 · 人生排行榜',boards.rankingRows],
-        ['showTigerBoard','tigerboard','步云录 · 老虎榜',boards.tigerRows],
+        ['showLeaderboard','leaderboard','步步有为 · 人生排行榜',boards.rankingRows],
+        ['showTigerBoard','tigerboard','步步有为 · 老虎榜',boards.tigerRows],
         ['showEscapeBoard','escapeboard','金蝉榜 · 虚构结局记录',boards.escapeRows],
       ])page[method]=async function(){
         const sequence=++boardRequest,ending=method==='showLeaderboard'&&!!this.data.state.ended;

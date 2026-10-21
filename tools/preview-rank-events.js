@@ -36,7 +36,7 @@ const body = RANK_EVENT_POOL.map((pool, index) => {
 const html = `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>步云录 · 季度工作题库预览（${total} 道）</title>
+<title>步步有为 · 季度工作题库预览（${total} 道）</title>
 <style>
 :root{--bg:#f6f5f2;--card:#fff;--ink:#1d1c1a;--dim:#6b6862;--line:#e3e0d9;--best:#b3261e;--bad:#2f6b3a}
 *{box-sizing:border-box}
@@ -66,7 +66,7 @@ u{text-decoration:none;margin-left:8px}
 u i{font-style:normal;font-size:11px;color:var(--dim);margin-right:6px}
 @media(max-width:640px){header,nav,main{padding-left:16px;padding-right:16px}nav{position:static}section h2{position:static}}
 </style></head><body>
-<header><h1>步云录 · 季度工作题库预览</h1>
+<header><h1>步步有为 · 季度工作题库预览</h1>
 <p>共 ${RANKS.length} 个职级 · ${total} 道 · 去重题名 ${uniqueTitles} 个。每个职级只从自己的题库抽取，且完整轮一遍才开始重复。</p></header>
 <nav>${nav}</nav><main>${body}</main></body></html>`;
 

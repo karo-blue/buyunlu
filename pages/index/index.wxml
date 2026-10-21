@@ -67,7 +67,7 @@
 
       <view wx:if="{{currentEvent}}" id="event-card" class="event-card enter-three">
         <view class="event-head">
-          <text class="event-kicker">步云录 · 当前事项</text>
+          <text class="event-kicker">步步有为 · 当前事项</text>
           <text class="event-title">{{currentEvent.title}}</text>
         </view>
         <text class="event-scene">{{currentEvent.scene}}</text>
@@ -150,7 +150,7 @@
         <text class="warning-word">出逃</text>
         <text class="warning-label">去向记录</text>
       </view>
-      <view class="dialog-kicker">步云录 · 当前事项</view>
+      <view class="dialog-kicker">步步有为 · 当前事项</view>
       <text class="dialog-title">{{dialog.title}}</text>
       <scroll-view class="dialog-content-scroll dialog-body" scroll-y enhanced show-scrollbar="{{false}}">
         <text wx:if="{{dialog.content}}" class="dialog-content">{{dialog.content}}</text>
@@ -229,7 +229,7 @@
     <view class="nameselect-backdrop" catchtap="noop" catchtouchmove="true"></view>
     <view class="nameselect-card" catchtap="noop">
       <scroll-view class="nameselect-scroll" scroll-y enhanced show-scrollbar="{{false}}">
-        <text class="nameselect-kicker">步云录 · 开局起名</text>
+        <text class="nameselect-kicker">步步有为 · 开局起名</text>
         <text class="nameselect-title">为你的仕途起个名字</text>
         <text class="nameselect-sub">先选姓氏，再从每批15个内置名字中选择。名称不支持自由输入，只保存在本机存档中。</text>
         <view class="nameselect-surname-row">

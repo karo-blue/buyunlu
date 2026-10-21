@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, '../..');
 test('home-screen app has scoped manifest, real icons and Apple launch metadata', () => {
   const { output } = build();
   const manifest = JSON.parse(fs.readFileSync(path.join(output, 'manifest.webmanifest'), 'utf8'));
-  assert.equal(manifest.name, '步云录');
+  assert.equal(manifest.name, '步步有为');
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.start_url, './');
   assert.equal(manifest.scope, './');

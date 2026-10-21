@@ -109,7 +109,7 @@ test('late or failed leaderboard reads never replace another board or pretend lo
  const first=f.page.showLeaderboard(),second=f.page.showTigerBoard();
  pending['/public/tigerboard?limit=8'].resolve({ok:true,total:12,entries:[{rank:1,name:'旧虎榜',rankIndex:8}]});await second;
  pending['/public/leaderboard?limit=8'].resolve({ok:true,total:2,entries:[{rank:1,name:'延迟旧响应'}]});await first;
- assert.equal(f.page.data.dialog.title,'步云录 · 老虎榜');
+ assert.equal(f.page.data.dialog.title,'步步有为 · 老虎榜');
  assert.equal(f.page.data.dialog.rows.find(row=>row.kind==='entry').name,'旧虎榜');
  const third=f.page.showEscapeBoard();pending['/public/escapeboard?limit=8'].reject(new Error('offline'));await third;
  assert.ok(f.page.data.dialog.rows.some(row=>/连接失败/.test(row.text)));

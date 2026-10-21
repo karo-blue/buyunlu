@@ -98,9 +98,9 @@ function createMailer({ env = process.env, createTransport, timeoutMs = 9500 } =
       const label = purpose === 'login' ? '登录验证码' : '邮箱验证码';
       return run(async (transport, from, site) => {
         const result = await transport.sendMail({
-          from: { name: '步云录', address: from }, to: { address: email },
-          envelope: { from, to: [email] }, subject: '步云录' + label,
-          text: `${username}，你好：\n\n你的步云录${label}是：${code}\n\n验证码 10 分钟内有效，请勿转发或提供给他人。\n如果不是你本人操作，请忽略此邮件。\n\n步云录${site ? ' ' + site : ''}`
+          from: { name: '步步有为', address: from }, to: { address: email },
+          envelope: { from, to: [email] }, subject: '步步有为' + label,
+          text: `${username}，你好：\n\n你的步步有为${label}是：${code}\n\n验证码 10 分钟内有效，请勿转发或提供给他人。\n如果不是你本人操作，请忽略此邮件。\n\n步步有为${site ? ' ' + site : ''}`
         });
         if (!result || !Array.isArray(result.accepted) || !result.accepted.some(address => String(address).toLowerCase() === email.toLowerCase())) {
           throw result?.rejectedErrors?.[0] || mailError(result?.rejected?.length ? 'SMTP_RECIPIENT_REJECTED' : 'SMTP_FAILED');

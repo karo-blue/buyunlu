@@ -1,7 +1,7 @@
 {
   "pages": ["pages/index/index"],
   "window": {
-    "navigationBarTitleText": "步云录",
+    "navigationBarTitleText": "步步有为",
     "navigationBarBackgroundColor": "#eef3ff",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#edf2ff",
