@@ -332,6 +332,18 @@ test('leaderboard responses restore only the current players full username witho
   assert.equal(remoteResult.entries[0].name, 'player_w');
 });
 
+test('leaderboard submission refuses a different account before forwarding and removes the account guard', async t => {
+  const { request, forwarded, verified } = await fixture(t);
+  const account = await verified();
+  const rejected = await request('/leaderboard/submit', { accountId: 'h5-other', rankIndex: 1 }, account.cookie);
+  assert.equal(rejected.status, 409);assert.match(rejected.body.error, /账号已变化/);
+  assert.equal(forwarded.length, 0);
+  const result = await request('/leaderboard/submit', { accountId: account.body.user.id, clientId: 'forged', rankIndex: 1 }, account.cookie);
+  assert.equal(result.status, 200);
+  const body = JSON.parse(forwarded[0].options.body);
+  assert.equal(body.clientId, account.body.user.id);assert.equal(body.accountId, undefined);
+});
+
 test('incorrect and expired codes cannot verify; new codes supersede old codes', async t => {
   const { request, messages, advance } = await fixture(t);
   const account = await request('/register', { username: 'player_a', password: 'long password 123', email: 'a@example.test' });

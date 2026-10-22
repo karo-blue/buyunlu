@@ -7,19 +7,58 @@
     const account=host.BuyunluCardAccount, api=host.BuyunluAPI.request;
     if(boards){
       let boardRequest=0;
+      let scoreUpload;
+      const signedOwner=()=>account.user?.emailVerified?account.user.id:null;
+      const submit=boards.submit;
+      boards.isConfigured=()=>!!signedOwner();
+      boards.submit=async function(state){
+        const owner=signedOwner();
+        if(!owner)throw new Error('请先登录并验证邮箱后同步成绩');
+        if(!state?.ended)throw new Error('产生结局后才会上传成绩');
+        if(state._webLeaderboardOwner&&state._webLeaderboardOwner!==owner)throw new Error('本局成绩属于其他账号，请切回原账号同步');
+        state._webLeaderboardOwner=owner;
+        if(storage&&!storage.save(state)){
+          host.wx.showToast({title:'成绩同步失败，请先释放本机存储空间再重试',icon:'none'});
+          throw new Error('结局存档未能保存');
+        }
+        return submit(state,(route,{data})=>{
+          const body={...data,accountId:owner};delete body.clientId;
+          const key=JSON.stringify(body);
+          if(scoreUpload?.owner===owner&&scoreUpload.key===key)return scoreUpload.promise;
+          const job={owner,key};scoreUpload=job;
+          job.promise=Promise.resolve().then(()=>api(route,body)).then(result=>{
+            if(signedOwner()!==owner)throw new Error('登录账号已变化，请重新打开排行榜');
+            host.wx.showToast({title:'成绩已同步至全网榜单',icon:'success'});
+            return result;
+          }).catch(cause=>{
+            if(scoreUpload===job)scoreUpload=null;
+            if(signedOwner()===owner)host.wx.showToast({title:'成绩同步失败，联网后重新打开排行榜可重试',icon:'none'});
+            throw cause;
+          });
+          return job.promise;
+        });
+      };
       for(const [method,path,title,format] of [
         ['showLeaderboard','leaderboard','步步有为 · 人生排行榜',boards.rankingRows],
         ['showTigerBoard','tigerboard','步步有为 · 老虎榜',boards.tigerRows],
         ['showEscapeBoard','escapeboard','金蝉榜 · 虚构结局记录',boards.escapeRows],
       ])page[method]=async function(){
         const sequence=++boardRequest,ending=method==='showLeaderboard'&&!!this.data.state.ended;
+        const owner=signedOwner();
         const show=rows=>this.showModal({title,rows,content:'',showCancel:ending,confirmText:ending?'再试一次':'确定',cancelText:'关闭',
           success:result=>{if(ending&&result.confirm)this.startFreshGame();}});
         show([{kind:'note',text:'正在读取原排行榜…'}]);
         try{
-          const result=await api('/public/'+path+'?limit=8');
+          let syncError;
+          if(owner&&this.data.state.ended)try{await boards.submit(this.data.state);}catch(cause){syncError=cause;}
           if(sequence!==boardRequest||!this.data.dialog.visible||this.data.dialog.title!==title)return;
-          show(format(result).map(row=>row.text==='本设备尚未提交结局成绩'?{...row,text:'与原小程序共用排行榜数据'}:row));
+          if(signedOwner()!==owner){show([{kind:'note',text:'登录账号已变化，请重新打开排行榜。'}]);return;}
+          const result=await api((owner?'/':'/public/')+path+'?limit=8');
+          if(sequence!==boardRequest||!this.data.dialog.visible||this.data.dialog.title!==title)return;
+          if(signedOwner()!==owner){show([{kind:'note',text:'登录账号已变化，请重新打开排行榜。'}]);return;}
+          const rows=format(result).map(row=>row.text==='本设备尚未提交结局成绩'?{...row,text:owner?'本账号尚未提交结局成绩':'与原小程序共用排行榜数据'}:owner&&row.player?{...row,name:row.name.replace('（本设备）','（本账号）')}:row);
+          if(syncError)rows.unshift({kind:'note',text:this.data.state._webLeaderboardOwner!==owner?'本局成绩属于其他账号，尚未同步；请切回原账号重试。':'本局成绩尚未同步，联网后重新打开排行榜可重试。'});
+          show(rows);
         }catch{
           if(sequence===boardRequest&&this.data.dialog.visible&&this.data.dialog.title===title)show([{kind:'note',text:'排行榜暂时连接失败，请稍后重试。'}]);
         }

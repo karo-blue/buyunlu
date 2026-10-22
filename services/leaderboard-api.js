@@ -52,12 +52,12 @@ function sanitizeRemote(result) {
   return Object.assign({}, result, { entries, total });
 }
 
-function submit(state) {
+function submit(state, send = request) {
   const source = state || {};
   // 落马结局在主榜仍会由服务端归零；同时提交落马前数据，供老虎榜展示。
   const fell = !!source.fallDetail;
   const escaped = !!(source.escapeDetail && source.ending === '出逃结局');
-  return request('/leaderboard/submit', {
+  return send('/leaderboard/submit', {
     method: 'POST',
     data: {
       clientId: getClientId(),

@@ -375,6 +375,8 @@ function createServer(options = {}) {
         const config = { method: request.method, headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) };
         if (request.method === 'POST') {
           const body = await bodyOf(request);
+          if (body.accountId !== undefined && body.accountId !== user.id) throw error(409, '登录账号已变化，请重新打开排行榜后同步');
+          delete body.accountId;
           delete body.email;
           config.body = JSON.stringify({ ...body, clientId: user.id, name: user.username });
         } else {
